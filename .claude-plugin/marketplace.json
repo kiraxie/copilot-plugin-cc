@@ -1,0 +1,17 @@
+{
+  "name": "copilot-plugin-cc",
+  "owner": { "name": "Kira Hsieh" },
+  "metadata": {
+    "description": "Delegate substantial implementation tasks to GitHub Copilot from Claude Code. Runs in an isolated git worktree with a quota gate so the orchestrator can auto-delegate safely.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "copilot",
+      "description": "Delegate substantial implementation tasks to GitHub Copilot from Claude Code.",
+      "version": "0.1.0",
+      "author": { "name": "Kira Hsieh" },
+      "source": "./"
+    }
+  ]
+}

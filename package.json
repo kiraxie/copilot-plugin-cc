@@ -1,0 +1,32 @@
+{
+  "name": "copilot-plugin-cc",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A Claude Code plugin that delegates implementation tasks to GitHub Copilot.",
+  "homepage": "https://github.com/kiraxie/copilot-plugin-cc#readme",
+  "bugs": {
+    "url": "https://github.com/kiraxie/copilot-plugin-cc/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kiraxie/copilot-plugin-cc.git"
+  },
+  "license": "ISC",
+  "author": "Kira Hsieh",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@github/copilot-sdk": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.4.0"
+  }
+}
