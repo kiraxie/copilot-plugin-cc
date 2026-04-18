@@ -59,22 +59,52 @@ node "${CLAUDE_PLUGIN_ROOT}/dist/copilot-companion.cjs" implement "<full scope d
 
 Pass `--allow-shell` when the task will require running tests, builds, or package installs (this is common). Pass `--background` if the task will clearly take >10 minutes and the user can continue working.
 
-## Parsing the response
+## Parsing the response and auto-merge
 
-The companion always writes a single JSON object to stdout. Parse it and handle by `status`:
+The companion writes a single JSON object to stdout. Handle by `status`:
 
-- `"completed"` — Relay `summary`, the `branch` name, `filesModified`, `linesAdded`/`linesRemoved`, and `quotaRemaining`. Tell the user the work is on that branch (their main working tree is untouched) and how to review it: `git diff main..<branch>` or `git checkout <branch>`.
-- `"queued"` — Return the `jobId` and tell the user to check `/copilot:status <jobId>` for progress and `/copilot:result <jobId>` when done.
-- `"blocked"` — Quota exhausted. Relay the `resetAt` and `message`. **Do not retry.** Fall back to doing the task in the main Claude thread.
-- `"failed"` — Relay the `error`. If a `branch` is present, the partial work is still on that branch for salvage.
+### `"completed"` — merge the branch
 
-## Worktree semantics
+After a successful implement, **automatically merge** the branch into the current working branch. Use a **second Bash call**:
 
-The return value is a git branch name. Copilot's work is on that branch only — the user's working tree is never directly modified. This makes delegation safe even on repos with uncommitted changes in the main cwd. The user (or the main Claude thread after your handoff) reviews via standard git tooling and decides whether to merge or cherry-pick.
+```bash
+git merge <branch> --no-edit
+```
+
+**If merge succeeds:**
+1. Delete the branch: `git branch -D <branch>`
+2. Return to the orchestrator with the `summary`, `filesModified`, `linesAdded`/`linesRemoved`, and `quotaRemaining`. State that the changes have been merged into the working tree.
+
+**If merge conflicts:**
+1. Collect the conflicting file list: `git diff --name-only --diff-filter=U`
+2. Abort the merge: `git merge --abort`
+3. Return to the orchestrator with:
+   - The `summary` of what Copilot did
+   - The list of conflicting files
+   - The branch name (preserved for manual resolution)
+   - A recommendation on **who should resolve**: if the conflicting files overlap with files the orchestrator has been editing in the current conversation, the orchestrator is better positioned to resolve (it has the context). Otherwise, suggest the user resolve manually or re-run the subtask with updated HEAD.
+
+The orchestrator (main Claude Code thread) then decides:
+- Resolve conflicts itself (it can `git merge <branch>`, fix conflicts, and commit)
+- Ask the user to resolve manually
+- Discard the branch and redo the subtask itself
+
+### `"queued"` (background)
+
+Return the `jobId` and tell the user to check `/copilot:status <jobId>` for progress and `/copilot:result <jobId>` when done. Do NOT attempt merge — the orchestrator handles that when retrieving the result.
+
+### `"blocked"`
+
+Quota exhausted. Relay the `resetAt` and `message`. **Do not retry.** Fall back to doing the task in the main Claude thread.
+
+### `"failed"`
+
+Relay the `error`. If a `branch` is present, the partial work is still on that branch for salvage. Do not attempt merge.
 
 ## General rules
 
-- Do not inspect the repository, reason through the problem yourself, or do any independent work beyond shaping the forwarded prompt.
+- You may use **up to two Bash calls** per delegation: one for `implement`, one for `git merge`. No other Bash activity.
+- Do not inspect the repository, reason through the problem yourself, or do any independent work beyond shaping the forwarded prompt and performing the merge.
 - Do not call `setup`, `status`, or `result` from this agent — only `implement`.
-- Return the companion's stdout envelope verbatim (preserving the JSON) OR, if that feels unfriendly for the user, a short narrative wrapper around the key fields. Never drop the branch name.
+- When reporting back to the orchestrator, always include: what Copilot changed (summary + files), whether the merge succeeded, and the quota remaining. Never drop the branch name if it still exists.
 - If the Bash call fails with a non-zero exit code, surface the error and stop.
