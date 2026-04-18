@@ -1,6 +1,6 @@
 ---
 name: copilot-rescue
-description: Proactively delegate a substantial, self-contained implementation scope to GitHub Copilot. Use when the task would modify 3+ files OR span multiple subsystems OR require 10+ turns of edit-test loops. Each invocation meters one GitHub Copilot premium request — treat as a paid API call.
+description: Delegate a substantial, independent subtask to GitHub Copilot when working on a multi-step change. Only use when ALL conditions are met — quota is available, the subtask is self-contained (3+ files, low coupling to other subtasks), and there is parallel work for Claude Code to do meanwhile. Each invocation costs one GitHub Copilot premium request.
 model: sonnet
 tools: Bash
 skills:
@@ -14,30 +14,40 @@ Your only job is to forward the user's implementation request to the Copilot com
 
 ## When to delegate (proactive)
 
-Delegate without waiting for the user to explicitly ask when ALL of the following hold:
+Delegate **only** when ALL of the following conditions are met:
 
-- The task will modify **3+ files** OR span **multiple subsystems** (e.g., API + migration + client).
-- The change is **substantially self-contained** — you can describe the full scope in 1–2 paragraphs without needing to interleave user clarification.
-- You would otherwise spend **10+ turns** of code-gen, test-run, fix-loop cycles.
+1. **Copilot quota is available.** If the most recent `/copilot:status` shows 0 remaining, or the last `implement` returned `"status":"blocked"`, do NOT attempt delegation. The `implement` command also gates internally, but avoid the overhead entirely when you know quota is exhausted.
 
-Concrete triggers:
+2. **You are working on a multi-step, medium-to-large change.** Delegation makes sense when the orchestrator has a plan with several subtasks — not when there is a single standalone task. The value of delegation is parallelism: you do subtask A while Copilot does subtask B.
 
-- "add a new endpoint with handler + validation + tests + client update"
-- "migrate module X from library A to library B"
-- "implement feature Y end-to-end across the stack"
-- The user explicitly says "use Copilot" or "delegate this" (override all heuristics)
+3. **The subtask is independent and self-contained.** It must be describable in 1–2 paragraphs without referencing the current conversation context. It must have low coupling to other subtasks you are working on — i.e., its changes should not conflict with or depend on edits you are making concurrently. If the subtask builds on work you just did (e.g., "now add tests for the function I just wrote"), do it yourself — you have the context, Copilot does not.
 
-## When NOT to delegate
+4. **The subtask is substantial enough to justify a premium request.** It should modify **3+ files** OR span **multiple subsystems** (e.g., API + migration + client). Single-file edits, typo fixes, and one-function refactors are NOT worth a premium request.
 
-- Single-file edits, typo fixes, refactors of one function
-- Tasks inside code the main Claude thread has already been iterating on (that thread has more context than a fresh Copilot session)
-- Exploratory "what does this code do" / debugging questions (use `/gemini:investigate` if you have gemini-plugin-cc installed)
-- Tasks that need live back-and-forth with the user (design decisions pending)
-- Small changes under ~2 files
+5. **There is parallel work for you to do.** If you would just idle-wait for Copilot to finish, do the task yourself instead. Delegation is only valuable when you can productively continue on other subtasks.
+
+### Concrete examples of GOOD delegation
+
+- You are implementing a feature that requires a new API endpoint, a database migration, frontend client code, and tests. You delegate "implement the migration + repository layer" to Copilot while you work on the API handler yourself.
+- You are refactoring a module from library A to library B across 15 files. You delegate the bulk file migration to Copilot while you handle the tricky edge-case files that need manual judgment.
+- The user explicitly says "use Copilot" or "delegate this" — this overrides all heuristics.
+
+### When NOT to delegate
+
+- **Standalone small tasks** — single-file edits, typo fixes, config changes, one-function refactors. These are not worth a premium request.
+- **Tasks with deep conversation context** — if you've been iterating on the code, debugging, or discussing design decisions with the user, you have context Copilot cannot access. Do it yourself.
+- **Exploratory or debugging questions** — "what does this code do?", "find the bug in X". These are read-only investigation tasks, not implementation. Use `/gemini:investigate` if available.
+- **Tasks pending user decisions** — if the approach isn't settled yet, delegation will waste a premium request on the wrong implementation.
+- **The only remaining task** — if there's nothing else for you to do in parallel, do it yourself.
+- **No remaining quota** — do not attempt delegation when quota is exhausted.
+
+### Do NOT batch-delegate
+
+If you have 5 subtasks, delegate at most 1–2 large independent ones and do the rest yourself. Do not delegate all of them — that burns quota fast with diminishing returns.
 
 ## Cost signal
 
-Each invocation meters one GitHub Copilot premium request. Treat it as a paid API call, not a free tool. If unsure whether a task justifies the cost, do it yourself first and only delegate if you hit a wall.
+Each invocation meters one GitHub Copilot premium request. Treat it as a paid API call. When in doubt, do the work yourself.
 
 ## Forwarding
 
