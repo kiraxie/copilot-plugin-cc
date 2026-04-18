@@ -110,8 +110,24 @@ export function createWorktree(jobId: string, cwd: string, opts: CreateWorktreeO
   return { path: worktreePath, branch, baseCommit, repoRoot };
 }
 
+/**
+ * Copilot edits files but does NOT commit them. This function stages and
+ * commits all changes in the worktree so the branch carries the deliverable
+ * and `computeDiffStats` works correctly.
+ *
+ * Returns `true` if a commit was created, `false` if the worktree was clean.
+ */
+export function commitWorktreeChanges(handle: WorktreeHandle, message: string): boolean {
+  const dirty = tryGit(['status', '--porcelain'], handle.path);
+  if (!dirty.ok || !dirty.stdout.trim()) return false;
+
+  tryGit(['add', '-A'], handle.path);
+  const commit = tryGit(['commit', '-m', message], handle.path);
+  return commit.ok;
+}
+
 export interface CleanupOptions {
-  /** `true` if the Copilot session finished cleanly and produced commits. */
+  /** `true` if the Copilot session finished cleanly. */
   success: boolean;
   onWarn?: (message: string) => void;
 }

@@ -21,8 +21,8 @@ import { checkAuth } from '../lib/copilot-auth.js';
 import { makePermissionHandler } from '../lib/permission.js';
 import { attachStream } from '../lib/event-stream.js';
 import {
-  createWorktree, cleanupWorktree, computeDiffStats, resolveRepoRoot,
-  type WorktreeHandle,
+  createWorktree, cleanupWorktree, commitWorktreeChanges, computeDiffStats,
+  resolveRepoRoot, type WorktreeHandle,
 } from '../lib/worktree.js';
 import { CLIENT_NAME, PLUGIN_VERSION } from '../lib/version.js';
 
@@ -280,7 +280,18 @@ export async function runImplement(task: string, cwd: string, options: Implement
   stream.dispose();
   await client.stop().catch(() => { /* ignore */ });
 
-  // 8. Compute diff from git (trustworthy source). ---------------------------
+  // 8. Commit worktree changes (Copilot edits files but does not commit). -----
+  if (handle) {
+    const taskSummary = (completionResult?.summary ?? task).slice(0, 72);
+    const committed = commitWorktreeChanges(handle, `copilot: ${taskSummary}`);
+    if (committed) {
+      log('auto-committed worktree changes');
+    } else {
+      log('no uncommitted changes in worktree (Copilot may not have edited any files)');
+    }
+  }
+
+  // 9. Compute diff from git (trustworthy source). ---------------------------
   let filesModified: string[] = [];
   let linesAdded = 0;
   let linesRemoved = 0;

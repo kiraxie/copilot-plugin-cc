@@ -5900,15 +5900,18 @@ function evaluateGate(snapshot, opts) {
     return { ok: true, reason: "no_cache" };
   }
   const entries = Object.values(snapshot.quotas);
-  if (entries.some((q) => q.isUnlimitedEntitlement)) {
+  const metered = entries.filter(
+    (q) => !q.isUnlimitedEntitlement && q.entitlementRequests > 0
+  );
+  if (metered.length === 0) {
     return { ok: true, reason: "unlimited" };
   }
-  if (entries.every((q) => q.remainingPercentage <= 0) && entries.some((q) => q.usageAllowedWithExhaustedQuota)) {
+  if (metered.every((q) => q.remainingPercentage <= 0) && metered.some((q) => q.usageAllowedWithExhaustedQuota)) {
     return { ok: true, reason: "overage_allowed" };
   }
   let minRemainingAbs = Number.POSITIVE_INFINITY;
   let tightestReset = "";
-  for (const q of entries) {
+  for (const q of metered) {
     const remaining = Math.max(0, q.entitlementRequests - q.usedRequests);
     if (remaining < minRemainingAbs) {
       minRemainingAbs = remaining;
@@ -5932,11 +5935,14 @@ function summarize(snapshot) {
   if (!snapshot) return {};
   const entries = Object.values(snapshot.quotas);
   if (entries.length === 0) return {};
-  if (entries.some((q) => q.isUnlimitedEntitlement)) return { unlimited: true };
+  const metered = entries.filter(
+    (q) => !q.isUnlimitedEntitlement && q.entitlementRequests > 0
+  );
+  if (metered.length === 0) return { unlimited: true };
   let minRemaining = Number.POSITIVE_INFINITY;
   let minPct = 100;
   let tightestReset = "";
-  for (const q of entries) {
+  for (const q of metered) {
     const remaining = Math.max(0, q.entitlementRequests - q.usedRequests);
     if (remaining < minRemaining) {
       minRemaining = remaining;
@@ -6017,6 +6023,13 @@ function createWorktree(jobId, cwd, opts) {
     }
   }
   return { path: worktreePath, branch, baseCommit, repoRoot };
+}
+function commitWorktreeChanges(handle, message) {
+  const dirty = tryGit(["status", "--porcelain"], handle.path);
+  if (!dirty.ok || !dirty.stdout.trim()) return false;
+  tryGit(["add", "-A"], handle.path);
+  const commit = tryGit(["commit", "-m", message], handle.path);
+  return commit.ok;
 }
 function cleanupWorktree(handle, opts) {
   if (opts.success) {
@@ -6190,7 +6203,7 @@ async function runSetup(options = {}) {
     if (report.quota.unlimited) {
       lines.push("- Unlimited entitlement.");
     } else {
-      const pct = typeof report.quota.percentage === "number" ? `${(report.quota.percentage * 100).toFixed(1)}%` : "?";
+      const pct = typeof report.quota.percentage === "number" ? `${report.quota.percentage.toFixed(1)}%` : "?";
       lines.push(`- ${report.quota.premium ?? "?"} premium request(s) remaining (${pct})`);
       if (report.quota.resetAt) lines.push(`- Resets at ${report.quota.resetAt}`);
     }
@@ -6308,6 +6321,9 @@ function truncate(text, max) {
 function attachStream(opts) {
   const { session, stateDir, appendLog: appendLog2, progress } = opts;
   let lastAssistantMessage;
+  let taskCompleteSummary;
+  let taskCompleteSuccess;
+  let completed = false;
   let resolveCompletion;
   let rejectCompletion;
   const completion = new Promise((res, rej) => {
@@ -6338,7 +6354,7 @@ function attachStream(opts) {
           for (const k of keys) {
             const q = snapshots[k];
             const remaining = Math.max(0, q.entitlementRequests - q.usedRequests);
-            progress(`[quota:${k}] ${remaining}/${q.entitlementRequests} remaining (${(q.remainingPercentage * 100).toFixed(1)}%)`);
+            progress(`[quota:${k}] ${remaining}/${q.entitlementRequests} remaining (${q.remainingPercentage.toFixed(1)}%)`);
           }
         }
         const reqId = event.data.providerCallId ?? event.data.apiCallId;
@@ -6346,9 +6362,22 @@ function attachStream(opts) {
         break;
       }
       case "session.task_complete": {
+        taskCompleteSummary = event.data.summary;
+        taskCompleteSuccess = event.data.success;
         appendLog2(`session.task_complete success=${event.data.success ?? "unknown"}`);
         progress(`[task_complete] ${event.data.success === false ? "failed" : "ok"}`);
-        resolveCompletion({ summary: event.data.summary, success: event.data.success });
+        break;
+      }
+      case "session.idle": {
+        if (!completed) {
+          completed = true;
+          appendLog2("session.idle \u2014 resolving as completion");
+          progress("[idle] session finished processing");
+          resolveCompletion({
+            summary: taskCompleteSummary,
+            success: taskCompleteSuccess
+          });
+        }
         break;
       }
       case "session.shutdown": {
@@ -6373,7 +6402,10 @@ function attachStream(opts) {
         const msg = event.data.message ?? "unknown session error";
         appendLog2(`session.error: ${msg}`);
         progress(`[error] ${msg}`);
-        rejectCompletion(new Error(msg));
+        if (!completed) {
+          completed = true;
+          rejectCompletion(new Error(msg));
+        }
         break;
       }
       case "session.warning": {
@@ -6644,6 +6676,15 @@ async function runImplement(task, cwd, options = {}) {
   stream.dispose();
   await client.stop().catch(() => {
   });
+  if (handle) {
+    const taskSummary = (completionResult?.summary ?? task).slice(0, 72);
+    const committed = commitWorktreeChanges(handle, `copilot: ${taskSummary}`);
+    if (committed) {
+      log("auto-committed worktree changes");
+    } else {
+      log("no uncommitted changes in worktree (Copilot may not have edited any files)");
+    }
+  }
   let filesModified = [];
   let linesAdded = 0;
   let linesRemoved = 0;
@@ -6761,7 +6802,7 @@ function renderQuotaBlock(haveSnapshot, q) {
     lines.push("- Unlimited entitlement.");
     return lines.join("\n");
   }
-  const pct = typeof q.percentage === "number" ? `${(q.percentage * 100).toFixed(1)}%` : "?";
+  const pct = typeof q.percentage === "number" ? `${q.percentage.toFixed(1)}%` : "?";
   lines.push(`- ${q.premium ?? "?"} premium request(s) remaining (${pct})`);
   if (q.resetAt) lines.push(`- Resets at ${q.resetAt}`);
   return lines.join("\n");

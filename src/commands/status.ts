@@ -88,7 +88,7 @@ function renderQuotaBlock(haveSnapshot: boolean, q: ReturnType<typeof summarize>
     lines.push('- Unlimited entitlement.');
     return lines.join('\n');
   }
-  const pct = typeof q.percentage === 'number' ? `${(q.percentage * 100).toFixed(1)}%` : '?';
+  const pct = typeof q.percentage === 'number' ? `${q.percentage.toFixed(1)}%` : '?';
   lines.push(`- ${q.premium ?? '?'} premium request(s) remaining (${pct})`);
   if (q.resetAt) lines.push(`- Resets at ${q.resetAt}`);
   return lines.join('\n');

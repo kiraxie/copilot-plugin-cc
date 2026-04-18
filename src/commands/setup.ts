@@ -137,7 +137,7 @@ export async function runSetup(options: SetupOptions = {}): Promise<void> {
     if (report.quota.unlimited) {
       lines.push('- Unlimited entitlement.');
     } else {
-      const pct = typeof report.quota.percentage === 'number' ? `${(report.quota.percentage * 100).toFixed(1)}%` : '?';
+      const pct = typeof report.quota.percentage === 'number' ? `${report.quota.percentage.toFixed(1)}%` : '?';
       lines.push(`- ${report.quota.premium ?? '?'} premium request(s) remaining (${pct})`);
       if (report.quota.resetAt) lines.push(`- Resets at ${report.quota.resetAt}`);
     }

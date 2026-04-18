@@ -92,21 +92,30 @@ export function evaluateGate(
 
   const entries = Object.values(snapshot.quotas);
 
-  if (entries.some((q) => q.isUnlimitedEntitlement)) {
+  // Only consider metered quotas (where entitlementRequests > 0 and not unlimited).
+  // Some quotas like "chat" and "completions" report entitlementRequests=-1
+  // with isUnlimitedEntitlement=true — we skip those and focus on the real
+  // constrained quota like "premium_interactions".
+  const metered = entries.filter(
+    (q) => !q.isUnlimitedEntitlement && q.entitlementRequests > 0,
+  );
+
+  if (metered.length === 0) {
+    // All quotas are unlimited — no gate needed.
     return { ok: true, reason: 'unlimited' };
   }
 
   if (
-    entries.every((q) => q.remainingPercentage <= 0) &&
-    entries.some((q) => q.usageAllowedWithExhaustedQuota)
+    metered.every((q) => q.remainingPercentage <= 0) &&
+    metered.some((q) => q.usageAllowedWithExhaustedQuota)
   ) {
     return { ok: true, reason: 'overage_allowed' };
   }
 
-  // Use the tightest quota: minimum absolute remaining across all metered entries.
+  // Use the tightest metered quota.
   let minRemainingAbs = Number.POSITIVE_INFINITY;
   let tightestReset = '';
-  for (const q of entries) {
+  for (const q of metered) {
     const remaining = Math.max(0, q.entitlementRequests - q.usedRequests);
     if (remaining < minRemainingAbs) {
       minRemainingAbs = remaining;
@@ -142,12 +151,16 @@ export function summarize(snapshot: QuotaSnapshot | null): {
   if (!snapshot) return {};
   const entries = Object.values(snapshot.quotas);
   if (entries.length === 0) return {};
-  if (entries.some((q) => q.isUnlimitedEntitlement)) return { unlimited: true };
+
+  const metered = entries.filter(
+    (q) => !q.isUnlimitedEntitlement && q.entitlementRequests > 0,
+  );
+  if (metered.length === 0) return { unlimited: true };
 
   let minRemaining = Number.POSITIVE_INFINITY;
   let minPct = 100;
   let tightestReset = '';
-  for (const q of entries) {
+  for (const q of metered) {
     const remaining = Math.max(0, q.entitlementRequests - q.usedRequests);
     if (remaining < minRemaining) {
       minRemaining = remaining;

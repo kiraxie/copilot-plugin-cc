@@ -24,7 +24,20 @@ export interface AttachOptions {
 export interface AttachedStream {
   /** Last `assistant.message` content seen. Fallback summary if task_complete.summary is empty. */
   getLastAssistantMessage: () => string | undefined;
-  /** Resolves when `session.task_complete` fires. Rejects on `session.error`. */
+  /**
+   * Resolves when the session finishes processing the prompt.
+   *
+   * Primary signal: `session.idle` — Copilot emits this after the agent has
+   * finished all tool calls for a given prompt. Despite the name, it is a
+   * prompt-level (not turn-level) completion indicator; `sendAndWait` uses
+   * it internally for the same purpose.
+   *
+   * Bonus signal: `session.task_complete` — carries a structured `summary`
+   * from the agent. If it fires before or at the same time as `idle`, its
+   * summary is captured. Not all agent tasks emit this event.
+   *
+   * Rejects on `session.error`.
+   */
   completion: Promise<TaskCompletion>;
   /** Resolves when `session.shutdown` fires (may happen only after disconnect). */
   shutdown: Promise<SessionShutdown>;
@@ -58,6 +71,9 @@ export function attachStream(opts: AttachOptions): AttachedStream {
   const { session, stateDir, appendLog, progress } = opts;
 
   let lastAssistantMessage: string | undefined;
+  let taskCompleteSummary: string | undefined;
+  let taskCompleteSuccess: boolean | undefined;
+  let completed = false;
 
   let resolveCompletion!: (value: TaskCompletion) => void;
   let rejectCompletion!: (err: Error) => void;
@@ -93,7 +109,7 @@ export function attachStream(opts: AttachOptions): AttachedStream {
           for (const k of keys) {
             const q = snapshots[k]!;
             const remaining = Math.max(0, q.entitlementRequests - q.usedRequests);
-            progress(`[quota:${k}] ${remaining}/${q.entitlementRequests} remaining (${(q.remainingPercentage * 100).toFixed(1)}%)`);
+            progress(`[quota:${k}] ${remaining}/${q.entitlementRequests} remaining (${q.remainingPercentage.toFixed(1)}%)`);
           }
         }
         const reqId = event.data.providerCallId ?? event.data.apiCallId;
@@ -102,9 +118,29 @@ export function attachStream(opts: AttachOptions): AttachedStream {
       }
 
       case 'session.task_complete': {
+        // Capture structured summary if the agent provides one. Not all
+        // tasks emit this event, so we do NOT use it as the completion signal.
+        taskCompleteSummary = event.data.summary;
+        taskCompleteSuccess = event.data.success;
         appendLog(`session.task_complete success=${event.data.success ?? 'unknown'}`);
         progress(`[task_complete] ${event.data.success === false ? 'failed' : 'ok'}`);
-        resolveCompletion({ summary: event.data.summary, success: event.data.success });
+        break;
+      }
+
+      case 'session.idle': {
+        // Primary completion signal: the session has finished processing the
+        // prompt and is ready for the next one. Resolve the completion promise
+        // with whatever summary we have (from task_complete or last assistant
+        // message).
+        if (!completed) {
+          completed = true;
+          appendLog('session.idle — resolving as completion');
+          progress('[idle] session finished processing');
+          resolveCompletion({
+            summary: taskCompleteSummary,
+            success: taskCompleteSuccess,
+          });
+        }
         break;
       }
 
@@ -131,7 +167,10 @@ export function attachStream(opts: AttachOptions): AttachedStream {
         const msg = event.data.message ?? 'unknown session error';
         appendLog(`session.error: ${msg}`);
         progress(`[error] ${msg}`);
-        rejectCompletion(new Error(msg));
+        if (!completed) {
+          completed = true;
+          rejectCompletion(new Error(msg));
+        }
         break;
       }
 
