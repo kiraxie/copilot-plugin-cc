@@ -9,7 +9,7 @@ import {
   resolveStateDir, listJobs, readJobFile, readLogTail, getSessionId,
   type JobRecord,
 } from '../lib/state.js';
-import { readSnapshot, summarize } from '../lib/quota.js';
+import { readSnapshot, summarize, renderQuotaBar } from '../lib/quota.js';
 
 export interface StatusOptions {
   jobId?: string;
@@ -53,22 +53,22 @@ export async function runStatus(cwd: string, options: StatusOptions = {}): Promi
   const finished = jobs.filter((j) => j.status === 'completed' || j.status === 'failed');
 
   if (running.length > 0) {
-    const rows: string[] = ['## Running'];
+    const block = ['## Running', renderJobsTable(running.map(toTableRow))];
+    const logLines: string[] = [];
     for (const job of running) {
       const logTail = readLogTail(stateDir, job.id, 3);
       const lastLine = logTail[logTail.length - 1] ?? '';
-      rows.push(`- **${job.id}** \`${job.kind}\` — ${job.summary} [${job.status}] ${lastLine}`);
+      if (lastLine) logLines.push(`  ${job.id}: ${lastLine}`);
     }
-    sections.push(rows.join('\n'));
+    if (logLines.length > 0) {
+      block.push('Last log:');
+      block.push(...logLines);
+    }
+    sections.push(block.join('\n'));
   }
 
   if (finished.length > 0) {
-    const rows: string[] = ['## Recent'];
-    for (const job of finished.slice(0, 10)) {
-      const icon = job.status === 'completed' ? '✓' : '✗';
-      rows.push(`- ${icon} **${job.id}** \`${job.kind}\` — ${job.summary} [${job.status}]`);
-    }
-    sections.push(rows.join('\n'));
+    sections.push(['## Recent', renderJobsTable(finished.slice(0, 10).map(toTableRow))].join('\n'));
   }
 
   if (running.length === 0 && finished.length === 0) {
@@ -79,19 +79,51 @@ export async function runStatus(cwd: string, options: StatusOptions = {}): Promi
 }
 
 function renderQuotaBlock(haveSnapshot: boolean, q: ReturnType<typeof summarize>): string {
-  const lines: string[] = ['## Copilot Quota'];
-  if (!haveSnapshot) {
-    lines.push('- No snapshot yet. One will be captured on the next `implement` run.');
-    return lines.join('\n');
-  }
-  if (q.unlimited) {
-    lines.push('- Unlimited entitlement.');
-    return lines.join('\n');
-  }
-  const pct = typeof q.percentage === 'number' ? `${q.percentage.toFixed(1)}%` : '?';
-  lines.push(`- ${q.premium ?? '?'} premium request(s) remaining (${pct})`);
-  if (q.resetAt) lines.push(`- Resets at ${q.resetAt}`);
-  return lines.join('\n');
+  return ['## Copilot Quota', ...renderQuotaBar(q, haveSnapshot)].join('\n');
+}
+
+interface JobRow {
+  id: string;
+  kind: string;
+  status: string;
+  task: string;
+}
+
+function toTableRow(job: JobRecord): JobRow {
+  const icon =
+    job.status === 'completed' ? '✓ ' :
+    job.status === 'failed'    ? '✗ ' :
+    job.status === 'running'   ? '▶ ' :
+    job.status === 'queued'    ? '… ' : '  ';
+  return { id: job.id, kind: job.kind, status: icon + job.status, task: job.summary };
+}
+
+const TASK_MAX_WIDTH = 72;
+
+function renderJobsTable(rows: JobRow[]): string {
+  const headers: JobRow = { id: 'Job ID', kind: 'Command', status: 'Status', task: 'Task' };
+  const widths = {
+    id: Math.max(headers.id.length, ...rows.map((r) => r.id.length)),
+    kind: Math.max(headers.kind.length, ...rows.map((r) => r.kind.length)),
+    status: Math.max(headers.status.length, ...rows.map((r) => r.status.length)),
+    task: Math.min(TASK_MAX_WIDTH, Math.max(headers.task.length, ...rows.map((r) => r.task.length))),
+  };
+  const border = (l: string, m: string, r: string): string =>
+    l + '─'.repeat(widths.id + 2) + m +
+    '─'.repeat(widths.kind + 2) + m +
+    '─'.repeat(widths.status + 2) + m +
+    '─'.repeat(widths.task + 2) + r;
+  const renderRow = (r: JobRow): string => {
+    const task = r.task.length > widths.task ? r.task.slice(0, widths.task - 1) + '…' : r.task.padEnd(widths.task);
+    return `│ ${r.id.padEnd(widths.id)} │ ${r.kind.padEnd(widths.kind)} │ ${r.status.padEnd(widths.status)} │ ${task} │`;
+  };
+  return [
+    border('┌', '┬', '┐'),
+    renderRow(headers),
+    border('├', '┼', '┤'),
+    ...rows.map(renderRow),
+    border('└', '┴', '┘'),
+  ].join('\n');
 }
 
 function renderJobDetail(job: JobRecord, logTail: string[]): string {

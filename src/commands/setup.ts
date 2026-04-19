@@ -6,7 +6,7 @@ import { CopilotClient } from '@github/copilot-sdk';
 import type { ModelInfo } from '@github/copilot-sdk';
 
 import { checkAuth } from '../lib/copilot-auth.js';
-import { readSnapshot, summarize } from '../lib/quota.js';
+import { readSnapshot, summarize, renderQuotaBar } from '../lib/quota.js';
 import { pruneOrphans } from '../lib/worktree.js';
 import { resolveStateDir } from '../lib/state.js';
 import { CLIENT_NAME, PLUGIN_VERSION } from '../lib/version.js';
@@ -131,21 +131,10 @@ export async function runSetup(options: SetupOptions = {}): Promise<void> {
     lines.push('### Claude models detected');
     for (const m of claudeModels) lines.push(`- \`${m}\``);
   }
-  if (report.quota && (report.quota.premium !== undefined || report.quota.unlimited)) {
-    lines.push('');
-    lines.push('### Quota');
-    if (report.quota.unlimited) {
-      lines.push('- Unlimited entitlement.');
-    } else {
-      const pct = typeof report.quota.percentage === 'number' ? `${report.quota.percentage.toFixed(1)}%` : '?';
-      lines.push(`- ${report.quota.premium ?? '?'} premium request(s) remaining (${pct})`);
-      if (report.quota.resetAt) lines.push(`- Resets at ${report.quota.resetAt}`);
-    }
-  } else {
-    lines.push('');
-    lines.push('### Quota');
-    lines.push('- No quota snapshot yet. One will be captured on the first `implement` run.');
-  }
+  lines.push('');
+  lines.push('### Quota');
+  const haveSnapshot = !!(report.quota && (report.quota.premium !== undefined || report.quota.unlimited));
+  lines.push(...renderQuotaBar(report.quota ?? {}, haveSnapshot));
   lines.push('');
   lines.push('### Housekeeping');
   lines.push(`- Worktrees pruned: ${pruneReport.worktreesPruned ? 'yes' : 'skipped (not a git repo or prune failed)'}`);

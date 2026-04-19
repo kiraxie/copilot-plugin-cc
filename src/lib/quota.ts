@@ -144,6 +144,7 @@ export function evaluateGate(
  */
 export function summarize(snapshot: QuotaSnapshot | null): {
   premium?: number;
+  entitlement?: number;
   percentage?: number;
   resetAt?: string;
   unlimited?: boolean;
@@ -160,17 +161,69 @@ export function summarize(snapshot: QuotaSnapshot | null): {
   let minRemaining = Number.POSITIVE_INFINITY;
   let minPct = 100;
   let tightestReset = '';
+  let tightestEntitlement = 0;
   for (const q of metered) {
     const remaining = Math.max(0, q.entitlementRequests - q.usedRequests);
     if (remaining < minRemaining) {
       minRemaining = remaining;
       tightestReset = q.resetDate;
+      tightestEntitlement = q.entitlementRequests;
     }
     if (q.remainingPercentage < minPct) minPct = q.remainingPercentage;
   }
   return {
     premium: minRemaining === Number.POSITIVE_INFINITY ? undefined : minRemaining,
+    entitlement: tightestEntitlement || undefined,
     percentage: minPct,
     resetAt: tightestReset || undefined,
   };
+}
+
+const BAR_WIDTH = 30;
+
+function renderBar(usedPct: number): string {
+  const clamped = Math.max(0, Math.min(100, usedPct));
+  const filled = Math.round((clamped / 100) * BAR_WIDTH);
+  return '█'.repeat(filled) + '░'.repeat(BAR_WIDTH - filled);
+}
+
+function daysUntil(iso: string): number | null {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return null;
+  const diffMs = t - Date.now();
+  if (diffMs <= 0) return 0;
+  return Math.ceil(diffMs / (24 * 60 * 60 * 1000));
+}
+
+/**
+ * Render the quota block with a usage bar. Shared by `status` and `setup`.
+ */
+export function renderQuotaBar(
+  q: ReturnType<typeof summarize>,
+  haveSnapshot: boolean,
+): string[] {
+  if (!haveSnapshot) {
+    return ['- No snapshot yet. One will be captured on the next `implement` run.'];
+  }
+  if (q.unlimited) {
+    return ['- Unlimited entitlement.'];
+  }
+
+  const lines: string[] = [];
+  const remainingPct = typeof q.percentage === 'number' ? q.percentage : 0;
+  const usedPct = 100 - remainingPct;
+  lines.push(`Usage      ${renderBar(usedPct)}  ${usedPct.toFixed(1)}%`);
+
+  if (q.premium !== undefined) {
+    const total = q.entitlement ?? '?';
+    lines.push(`Remaining  ${q.premium} / ${total}  premium requests`);
+  }
+
+  if (q.resetAt) {
+    const days = daysUntil(q.resetAt);
+    const suffix = days === null ? '' : days === 0 ? '  (resets today)' : `  (in ~${days} days)`;
+    lines.push(`Resets     ${q.resetAt}${suffix}`);
+  }
+
+  return lines;
 }

@@ -5942,19 +5942,57 @@ function summarize(snapshot) {
   let minRemaining = Number.POSITIVE_INFINITY;
   let minPct = 100;
   let tightestReset = "";
+  let tightestEntitlement = 0;
   for (const q of metered) {
     const remaining = Math.max(0, q.entitlementRequests - q.usedRequests);
     if (remaining < minRemaining) {
       minRemaining = remaining;
       tightestReset = q.resetDate;
+      tightestEntitlement = q.entitlementRequests;
     }
     if (q.remainingPercentage < minPct) minPct = q.remainingPercentage;
   }
   return {
     premium: minRemaining === Number.POSITIVE_INFINITY ? void 0 : minRemaining,
+    entitlement: tightestEntitlement || void 0,
     percentage: minPct,
     resetAt: tightestReset || void 0
   };
+}
+var BAR_WIDTH = 30;
+function renderBar(usedPct) {
+  const clamped = Math.max(0, Math.min(100, usedPct));
+  const filled = Math.round(clamped / 100 * BAR_WIDTH);
+  return "\u2588".repeat(filled) + "\u2591".repeat(BAR_WIDTH - filled);
+}
+function daysUntil(iso) {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return null;
+  const diffMs = t - Date.now();
+  if (diffMs <= 0) return 0;
+  return Math.ceil(diffMs / (24 * 60 * 60 * 1e3));
+}
+function renderQuotaBar(q, haveSnapshot) {
+  if (!haveSnapshot) {
+    return ["- No snapshot yet. One will be captured on the next `implement` run."];
+  }
+  if (q.unlimited) {
+    return ["- Unlimited entitlement."];
+  }
+  const lines = [];
+  const remainingPct = typeof q.percentage === "number" ? q.percentage : 0;
+  const usedPct = 100 - remainingPct;
+  lines.push(`Usage      ${renderBar(usedPct)}  ${usedPct.toFixed(1)}%`);
+  if (q.premium !== void 0) {
+    const total = q.entitlement ?? "?";
+    lines.push(`Remaining  ${q.premium} / ${total}  premium requests`);
+  }
+  if (q.resetAt) {
+    const days = daysUntil(q.resetAt);
+    const suffix = days === null ? "" : days === 0 ? "  (resets today)" : `  (in ~${days} days)`;
+    lines.push(`Resets     ${q.resetAt}${suffix}`);
+  }
+  return lines;
 }
 
 // src/lib/worktree.ts
@@ -6197,21 +6235,10 @@ async function runSetup(options = {}) {
     lines.push("### Claude models detected");
     for (const m of claudeModels) lines.push(`- \`${m}\``);
   }
-  if (report.quota && (report.quota.premium !== void 0 || report.quota.unlimited)) {
-    lines.push("");
-    lines.push("### Quota");
-    if (report.quota.unlimited) {
-      lines.push("- Unlimited entitlement.");
-    } else {
-      const pct = typeof report.quota.percentage === "number" ? `${report.quota.percentage.toFixed(1)}%` : "?";
-      lines.push(`- ${report.quota.premium ?? "?"} premium request(s) remaining (${pct})`);
-      if (report.quota.resetAt) lines.push(`- Resets at ${report.quota.resetAt}`);
-    }
-  } else {
-    lines.push("");
-    lines.push("### Quota");
-    lines.push("- No quota snapshot yet. One will be captured on the first `implement` run.");
-  }
+  lines.push("");
+  lines.push("### Quota");
+  const haveSnapshot = !!(report.quota && (report.quota.premium !== void 0 || report.quota.unlimited));
+  lines.push(...renderQuotaBar(report.quota ?? {}, haveSnapshot));
   lines.push("");
   lines.push("### Housekeeping");
   lines.push(`- Worktrees pruned: ${pruneReport.worktreesPruned ? "yes" : "skipped (not a git repo or prune failed)"}`);
@@ -6771,21 +6798,21 @@ async function runStatus(cwd, options = {}) {
   const running = jobs.filter((j) => j.status === "queued" || j.status === "running");
   const finished = jobs.filter((j) => j.status === "completed" || j.status === "failed");
   if (running.length > 0) {
-    const rows = ["## Running"];
+    const block = ["## Running", renderJobsTable(running.map(toTableRow))];
+    const logLines = [];
     for (const job of running) {
       const logTail = readLogTail(stateDir, job.id, 3);
       const lastLine = logTail[logTail.length - 1] ?? "";
-      rows.push(`- **${job.id}** \`${job.kind}\` \u2014 ${job.summary} [${job.status}] ${lastLine}`);
+      if (lastLine) logLines.push(`  ${job.id}: ${lastLine}`);
     }
-    sections.push(rows.join("\n"));
+    if (logLines.length > 0) {
+      block.push("Last log:");
+      block.push(...logLines);
+    }
+    sections.push(block.join("\n"));
   }
   if (finished.length > 0) {
-    const rows = ["## Recent"];
-    for (const job of finished.slice(0, 10)) {
-      const icon = job.status === "completed" ? "\u2713" : "\u2717";
-      rows.push(`- ${icon} **${job.id}** \`${job.kind}\` \u2014 ${job.summary} [${job.status}]`);
-    }
-    sections.push(rows.join("\n"));
+    sections.push(["## Recent", renderJobsTable(finished.slice(0, 10).map(toTableRow))].join("\n"));
   }
   if (running.length === 0 && finished.length === 0) {
     sections.push("_No background jobs._");
@@ -6793,19 +6820,33 @@ async function runStatus(cwd, options = {}) {
   console.log(sections.join("\n\n"));
 }
 function renderQuotaBlock(haveSnapshot, q) {
-  const lines = ["## Copilot Quota"];
-  if (!haveSnapshot) {
-    lines.push("- No snapshot yet. One will be captured on the next `implement` run.");
-    return lines.join("\n");
-  }
-  if (q.unlimited) {
-    lines.push("- Unlimited entitlement.");
-    return lines.join("\n");
-  }
-  const pct = typeof q.percentage === "number" ? `${q.percentage.toFixed(1)}%` : "?";
-  lines.push(`- ${q.premium ?? "?"} premium request(s) remaining (${pct})`);
-  if (q.resetAt) lines.push(`- Resets at ${q.resetAt}`);
-  return lines.join("\n");
+  return ["## Copilot Quota", ...renderQuotaBar(q, haveSnapshot)].join("\n");
+}
+function toTableRow(job) {
+  const icon = job.status === "completed" ? "\u2713 " : job.status === "failed" ? "\u2717 " : job.status === "running" ? "\u25B6 " : job.status === "queued" ? "\u2026 " : "  ";
+  return { id: job.id, kind: job.kind, status: icon + job.status, task: job.summary };
+}
+var TASK_MAX_WIDTH = 72;
+function renderJobsTable(rows) {
+  const headers = { id: "Job ID", kind: "Command", status: "Status", task: "Task" };
+  const widths = {
+    id: Math.max(headers.id.length, ...rows.map((r) => r.id.length)),
+    kind: Math.max(headers.kind.length, ...rows.map((r) => r.kind.length)),
+    status: Math.max(headers.status.length, ...rows.map((r) => r.status.length)),
+    task: Math.min(TASK_MAX_WIDTH, Math.max(headers.task.length, ...rows.map((r) => r.task.length)))
+  };
+  const border = (l, m, r) => l + "\u2500".repeat(widths.id + 2) + m + "\u2500".repeat(widths.kind + 2) + m + "\u2500".repeat(widths.status + 2) + m + "\u2500".repeat(widths.task + 2) + r;
+  const renderRow = (r) => {
+    const task = r.task.length > widths.task ? r.task.slice(0, widths.task - 1) + "\u2026" : r.task.padEnd(widths.task);
+    return `\u2502 ${r.id.padEnd(widths.id)} \u2502 ${r.kind.padEnd(widths.kind)} \u2502 ${r.status.padEnd(widths.status)} \u2502 ${task} \u2502`;
+  };
+  return [
+    border("\u250C", "\u252C", "\u2510"),
+    renderRow(headers),
+    border("\u251C", "\u253C", "\u2524"),
+    ...rows.map(renderRow),
+    border("\u2514", "\u2534", "\u2518")
+  ].join("\n");
 }
 function renderJobDetail(job, logTail) {
   const sections = [];
