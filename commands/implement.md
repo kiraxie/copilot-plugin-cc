@@ -18,4 +18,9 @@ Supports:
 - `--background` — enqueue as a background job; returns a job id
 - `--write <path>` — also write the final report to a file
 
-Return the stdout verbatim. It is a JSON envelope — the `copilot-rescue` agent parses it and relays the branch name plus summary, or handles `blocked` / `failed` states.
+The stdout is a single-line JSON envelope. Parse it and give the user a short human summary (2–4 lines) — do NOT paste the raw JSON, it is noisy and the host already shows it collapsed.
+
+- `completed` → state the branch name, files modified, quota remaining, and `summary`. Suggest reviewing the branch or merging it.
+- `queued` → state the `jobId` and point to `/copilot:status <jobId>` and `/copilot:result <jobId>`.
+- `blocked` → relay `resetAt`, `remaining`, and `message`. Do not retry.
+- `failed` → relay `error` and mention the branch (if any) so partial work can be salvaged.
