@@ -11,7 +11,8 @@
  */
 
 import type { PermissionHandler, PermissionRequest, PermissionRequestResult } from '@github/copilot-sdk';
-import { resolve } from 'node:path';
+import { realpathSync } from 'node:fs';
+import { dirname, isAbsolute, relative, resolve } from 'node:path';
 
 export interface PermissionOptions {
   /** If true, permit Copilot to execute shell commands. */
@@ -22,6 +23,11 @@ export interface PermissionOptions {
   worktreePath: string;
   /** Hook for logging every permission decision. */
   appendLog: (message: string) => void;
+  /**
+   * Hard read-only mode. When true, every write request is denied regardless
+   * of path. Used by the review command (no worktree, no edits expected).
+   */
+  readOnly?: boolean;
 }
 
 function approved(): PermissionRequestResult {
@@ -32,10 +38,30 @@ function denied(feedback: string): PermissionRequestResult {
   return { kind: 'denied-interactively-by-user', feedback };
 }
 
+function canonicalize(p: string): string {
+  // Canonicalize via realpath so symlinks cannot smuggle a path past a
+  // lexical containment check. For paths that do not exist yet (e.g. a
+  // pending write target), canonicalize the closest existing ancestor and
+  // append the unresolved tail — that is enough to defeat symlink escape
+  // because the unresolved suffix cannot itself be a symlink yet.
+  try {
+    return realpathSync(p);
+  } catch {
+    const parent = dirname(p);
+    if (parent === p) return resolve(p);
+    return resolve(canonicalize(parent), p.slice(parent.length).replace(/^[\\/]+/, ''));
+  }
+}
+
 function isPathInside(child: string, parent: string): boolean {
-  const c = resolve(child);
-  const p = resolve(parent);
-  return c === p || c.startsWith(p + '/');
+  const c = canonicalize(resolve(child));
+  const p = canonicalize(resolve(parent));
+  if (c === p) return true;
+  // Use path.relative so the check is separator- and drive-letter-aware on
+  // Windows (where canonical paths look like C:\repo\file and a hard-coded
+  // "/" prefix check would always fail).
+  const rel = relative(p, c);
+  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel);
 }
 
 export function makePermissionHandler(opts: PermissionOptions): PermissionHandler {
@@ -45,12 +71,31 @@ export function makePermissionHandler(opts: PermissionOptions): PermissionHandle
     switch (kind) {
       case 'read': {
         const path = (request as { path?: string }).path ?? '';
+        if (opts.readOnly) {
+          // In review mode, restrict reads to the working tree to prevent
+          // prompt-injection-driven exfiltration of files outside the repo
+          // (e.g. ~/.ssh, ~/.aws). Allow relative paths and any absolute path
+          // inside worktreePath; deny everything else.
+          if (!path) {
+            opts.appendLog('permission.read DENIED (read-only mode): empty path');
+            return denied('Permission request missing path.');
+          }
+          const absolute = path.startsWith('/') ? path : resolve(opts.worktreePath, path);
+          if (!isPathInside(absolute, opts.worktreePath)) {
+            opts.appendLog(`permission.read DENIED (outside worktree): ${absolute}`);
+            return denied(`Reads outside the review target (${opts.worktreePath}) are not permitted.`);
+          }
+        }
         opts.appendLog(`permission.read approved: ${path}`);
         return approved();
       }
 
       case 'write': {
         const fileName = (request as { fileName?: string }).fileName ?? '';
+        if (opts.readOnly) {
+          opts.appendLog(`permission.write DENIED (read-only mode): ${fileName}`);
+          return denied('This Copilot session is read-only (review mode). File writes are not permitted.');
+        }
         if (!fileName) {
           opts.appendLog('permission.write denied: no fileName provided');
           return denied('Permission request missing fileName.');
@@ -70,6 +115,12 @@ export function makePermissionHandler(opts: PermissionOptions): PermissionHandle
           toolName?: string;
           readOnly?: boolean;
         };
+        if (opts.readOnly && readOnly !== true) {
+          // In review mode we only auto-approve MCP calls the SDK explicitly
+          // marks read-only; anything else is a potential side-effect path.
+          opts.appendLog(`permission.mcp DENIED (read-only mode): ${serverName}/${toolName} (readOnly=${readOnly ?? 'unknown'})`);
+          return denied(`MCP tool ${serverName}/${toolName} is not marked read-only; not permitted in this Copilot review session.`);
+        }
         opts.appendLog(`permission.mcp approved: ${serverName}/${toolName} (readOnly=${readOnly ?? false})`);
         return approved();
       }

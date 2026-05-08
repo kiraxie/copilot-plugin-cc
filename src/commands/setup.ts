@@ -134,7 +134,7 @@ export async function runSetup(options: SetupOptions = {}): Promise<void> {
   lines.push('');
   lines.push('### Quota');
   const haveSnapshot = !!(report.quota && (report.quota.premium !== undefined || report.quota.unlimited));
-  lines.push(...renderQuotaBar(report.quota ?? {}, haveSnapshot));
+  lines.push(...renderQuotaBar(report.quota ?? { pools: [], allUnlimited: false }, haveSnapshot));
   lines.push('');
   lines.push('### Housekeeping');
   lines.push(`- Worktrees pruned: ${pruneReport.worktreesPruned ? 'yes' : 'skipped (not a git repo or prune failed)'}`);

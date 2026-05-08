@@ -68,6 +68,24 @@ export function recordSnapshot(
   return merged;
 }
 
+/**
+ * Whether a Copilot model ID consumes the premium request pool. Known
+ * premium-metered family today is `claude-opus-*`; everything else (Sonnet,
+ * Haiku, GPT-5.x, GPT-4.1) is Standard or Fast tier and does not increment
+ * `premium_interactions`. Conservative default: unknown IDs are treated as
+ * premium so the gate still protects the user.
+ */
+export function isPremiumModel(modelId: string | undefined): boolean {
+  if (!modelId) return true;
+  const id = modelId.toLowerCase();
+  if (id.startsWith('claude-opus-')) return true;
+  if (id.startsWith('claude-sonnet-')) return false;
+  if (id.startsWith('claude-haiku-')) return false;
+  if (id.startsWith('gpt-')) return false;
+  // Unknown family — fail closed.
+  return true;
+}
+
 export type GateDecision =
   | { ok: true; reason: 'unlimited' | 'overage_allowed' | 'available' | 'no_cache'; warning?: string }
   | { ok: false; reason: 'quota_exhausted'; remaining: number; resetAt: string };
@@ -139,39 +157,96 @@ export function evaluateGate(
   return warning ? { ok: true, reason: 'available', warning } : { ok: true, reason: 'available' };
 }
 
-/**
- * Summary view used by the status command and the completed envelope.
- */
-export function summarize(snapshot: QuotaSnapshot | null): {
+/** One entry per pool the SDK has reported, both metered and unlimited. */
+export interface PoolView {
+  id: string;
+  label: string;
+  unlimited: boolean;
+  /** Metered pools only — undefined when unlimited. */
+  used?: number;
+  total?: number;
+  remaining?: number;
+  remainingPercentage?: number;
+  resetAt?: string;
+}
+
+export interface QuotaSummary {
+  /** Per-pool views (every observed pool, not just the tightest one). */
+  pools: PoolView[];
+  /** True when every observed pool is unlimited. */
+  allUnlimited: boolean;
+
+  // ── Tightest-pool aggregate (backwards-compatible fields) ─────────────────
+  // These reflect the pool with the fewest remaining requests so callers that
+  // just want a single number (e.g. the review footer's "X remaining") keep
+  // working. Per-pool detail is in `pools`.
   premium?: number;
   entitlement?: number;
   percentage?: number;
   resetAt?: string;
+  /** Legacy alias preserved for status/setup renderers. */
   unlimited?: boolean;
-} {
-  if (!snapshot) return {};
-  const entries = Object.values(snapshot.quotas);
-  if (entries.length === 0) return {};
+}
 
-  const metered = entries.filter(
-    (q) => !q.isUnlimitedEntitlement && q.entitlementRequests > 0,
-  );
-  if (metered.length === 0) return { unlimited: true };
+const POOL_LABELS: Record<string, string> = {
+  premium_interactions: 'Premium requests',
+  chat: 'Chat',
+  completions: 'Completions',
+};
+
+function labelFor(id: string): string {
+  if (POOL_LABELS[id]) return POOL_LABELS[id];
+  return id.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * Summary view used by the status command and the completed envelope.
+ */
+export function summarize(snapshot: QuotaSnapshot | null): QuotaSummary {
+  if (!snapshot) return { pools: [], allUnlimited: false };
+  const entries = Object.entries(snapshot.quotas);
+  if (entries.length === 0) return { pools: [], allUnlimited: false };
+
+  const pools: PoolView[] = entries.map(([id, q]) => {
+    const isMetered = !q.isUnlimitedEntitlement && q.entitlementRequests > 0;
+    if (!isMetered) {
+      return { id, label: labelFor(id), unlimited: true };
+    }
+    const remaining = Math.max(0, q.entitlementRequests - q.usedRequests);
+    return {
+      id,
+      label: labelFor(id),
+      unlimited: false,
+      used: q.usedRequests,
+      total: q.entitlementRequests,
+      remaining,
+      remainingPercentage: q.remainingPercentage,
+      resetAt: q.resetDate || undefined,
+    };
+  });
+
+  const metered = pools.filter((p) => !p.unlimited);
+  if (metered.length === 0) {
+    return { pools, allUnlimited: true, unlimited: true };
+  }
 
   let minRemaining = Number.POSITIVE_INFINITY;
   let minPct = 100;
   let tightestReset = '';
   let tightestEntitlement = 0;
-  for (const q of metered) {
-    const remaining = Math.max(0, q.entitlementRequests - q.usedRequests);
-    if (remaining < minRemaining) {
-      minRemaining = remaining;
-      tightestReset = q.resetDate;
-      tightestEntitlement = q.entitlementRequests;
+  for (const p of metered) {
+    if (p.remaining !== undefined && p.remaining < minRemaining) {
+      minRemaining = p.remaining;
+      tightestReset = p.resetAt ?? '';
+      tightestEntitlement = p.total ?? 0;
     }
-    if (q.remainingPercentage < minPct) minPct = q.remainingPercentage;
+    if (p.remainingPercentage !== undefined && p.remainingPercentage < minPct) {
+      minPct = p.remainingPercentage;
+    }
   }
   return {
+    pools,
+    allUnlimited: false,
     premium: minRemaining === Number.POSITIVE_INFINITY ? undefined : minRemaining,
     entitlement: tightestEntitlement || undefined,
     percentage: minPct,
@@ -196,33 +271,49 @@ function daysUntil(iso: string): number | null {
 }
 
 /**
- * Render the quota block with a usage bar. Shared by `status` and `setup`.
+ * Render the quota block with a usage bar per metered pool. Shared by
+ * `status` and `setup`. Unlimited pools are listed at the end so the user can
+ * still see them, but they do not get a bar (no meaningful percentage).
  */
 export function renderQuotaBar(
-  q: ReturnType<typeof summarize>,
+  q: QuotaSummary,
   haveSnapshot: boolean,
 ): string[] {
   if (!haveSnapshot) {
     return ['- No snapshot yet. One will be captured on the next `implement` run.'];
   }
-  if (q.unlimited) {
-    return ['- Unlimited entitlement.'];
+  if (q.allUnlimited && q.pools.length > 0) {
+    return [`- Unlimited entitlement (${q.pools.map((p) => p.label).join(', ')}).`];
+  }
+  if (q.pools.length === 0) {
+    return ['- No quota information reported by Copilot yet.'];
   }
 
+  const metered = q.pools.filter((p) => !p.unlimited);
+  const unlimited = q.pools.filter((p) => p.unlimited);
   const lines: string[] = [];
-  const remainingPct = typeof q.percentage === 'number' ? q.percentage : 0;
-  const usedPct = 100 - remainingPct;
-  lines.push(`Usage      ${renderBar(usedPct)}  ${usedPct.toFixed(1)}%`);
 
-  if (q.premium !== undefined) {
-    const total = q.entitlement ?? '?';
-    lines.push(`Remaining  ${q.premium} / ${total}  premium requests`);
+  for (const p of metered) {
+    const remainingPct = p.remainingPercentage ?? 0;
+    const usedPct = 100 - remainingPct;
+    const total = p.total ?? '?';
+    const remaining = p.remaining ?? 0;
+    lines.push(`${p.label}`);
+    lines.push(`  Usage      ${renderBar(usedPct)}  ${usedPct.toFixed(1)}%`);
+    lines.push(`  Remaining  ${remaining} / ${total}`);
+    if (p.resetAt) {
+      const days = daysUntil(p.resetAt);
+      const suffix = days === null ? '' : days === 0 ? '  (resets today)' : `  (in ~${days} days)`;
+      lines.push(`  Resets     ${p.resetAt}${suffix}`);
+    }
+    lines.push('');
   }
+  // Drop trailing blank line introduced by the loop.
+  if (lines[lines.length - 1] === '') lines.pop();
 
-  if (q.resetAt) {
-    const days = daysUntil(q.resetAt);
-    const suffix = days === null ? '' : days === 0 ? '  (resets today)' : `  (in ~${days} days)`;
-    lines.push(`Resets     ${q.resetAt}${suffix}`);
+  if (unlimited.length > 0) {
+    if (lines.length > 0) lines.push('');
+    lines.push(`Unlimited: ${unlimited.map((p) => p.label).join(', ')}`);
   }
 
   return lines;

@@ -7,9 +7,11 @@
 import process from 'node:process';
 import { runSetup } from './commands/setup.js';
 import { runImplement } from './commands/implement.js';
+import { runReview } from './commands/review.js';
 import { runStatus } from './commands/status.js';
 import { runResult } from './commands/result.js';
 import { enqueueBackground, runWorker } from './commands/background.js';
+import type { ReviewScope } from './lib/git.js';
 
 function printUsage(): void {
   console.log(
@@ -20,12 +22,17 @@ function printUsage(): void {
       '                               [--no-worktree] [--allow-shell] [--allow-url]',
       '                               [--timeout <ms>] [--min-quota <n>]',
       '                               [--background] [--write <path>]',
+      '  copilot-companion review [focus...] [--adversarial] [--base <ref>]',
+      '                           [--scope auto|working-tree|branch]',
+      '                           [--model <id>] [--reasoning <low|medium|high|xhigh>]',
+      '                           [--timeout <ms>] [--min-quota <n>] [--background]',
       '  copilot-companion status [job-id] [--all] [--json]',
       '  copilot-companion result [job-id] [--json]',
       '',
       'Commands:',
       '  setup       Check GitHub Copilot authentication, available models, quota',
       '  implement   Delegate an implementation task to GitHub Copilot',
+      '  review      Run a Copilot code review (markdown output)',
       '  status      Show quota plus background job status',
       '  result      Retrieve a background job\'s output',
     ].join('\n'),
@@ -38,6 +45,22 @@ interface ParsedArgs {
   flags: Record<string, string | boolean>;
 }
 
+// Flags that never take a value. Without this set, a positional like
+// `--adversarial race condition` would bind "race" to --adversarial (string,
+// not boolean) and silently disable strict `=== true` checks downstream.
+const BOOLEAN_FLAGS = new Set<string>([
+  'adversarial',
+  'all',
+  'allow-shell',
+  'allow-url',
+  'background',
+  'check',
+  'help',
+  'json',
+  'no-worktree',
+  'wait',
+]);
+
 function parseArgs(argv: string[]): ParsedArgs {
   const command = argv[0] ?? 'help';
   const args: string[] = [];
@@ -46,7 +69,35 @@ function parseArgs(argv: string[]): ParsedArgs {
   for (let i = 1; i < argv.length; i++) {
     const arg = argv[i]!;
     if (arg.startsWith('--')) {
+      // Support --key=value form for explicit value binding.
+      const eq = arg.indexOf('=');
+      if (eq !== -1) {
+        const key = arg.slice(2, eq);
+        const value = arg.slice(eq + 1);
+        if (BOOLEAN_FLAGS.has(key)) {
+          // Boolean flags must not be assigned a value via `=`. Coerce common
+          // truthy spellings (`true`, `1`, `yes`) and reject everything else
+          // so a mistake like `--background=foo` errors loudly instead of
+          // running with `flags[background] = "foo"` (which fails === true
+          // and silently flips behavior).
+          const lc = value.toLowerCase();
+          if (lc === '' || lc === 'true' || lc === '1' || lc === 'yes') {
+            flags[key] = true;
+          } else if (lc === 'false' || lc === '0' || lc === 'no') {
+            flags[key] = false;
+          } else {
+            throw new Error(`Flag --${key} is boolean and cannot take value "${value}". Use --${key} or --no-${key}.`);
+          }
+          continue;
+        }
+        flags[key] = value;
+        continue;
+      }
       const key = arg.slice(2);
+      if (BOOLEAN_FLAGS.has(key)) {
+        flags[key] = true;
+        continue;
+      }
       const next = argv[i + 1];
       if (next !== undefined && !next.startsWith('--')) {
         flags[key] = next;
@@ -74,6 +125,22 @@ function flagNumber(flags: Record<string, string | boolean>, key: string): numbe
   return Number.isFinite(n) ? n : undefined;
 }
 
+function flagEnum<T extends string>(
+  flags: Record<string, string | boolean>,
+  key: string,
+  allowed: readonly T[],
+): T | undefined {
+  const v = flags[key];
+  if (v === undefined) return undefined;
+  if (typeof v !== 'string') {
+    throw new Error(`Flag --${key} requires a value (one of: ${allowed.join(', ')}).`);
+  }
+  if (!(allowed as readonly string[]).includes(v)) {
+    throw new Error(`Invalid --${key} value "${v}". Expected one of: ${allowed.join(', ')}.`);
+  }
+  return v as T;
+}
+
 async function main(): Promise<void> {
   const { command, args, flags } = parseArgs(process.argv.slice(2));
 
@@ -86,25 +153,49 @@ async function main(): Promise<void> {
       break;
 
     case 'implement': {
+      const reasoning = flagEnum(flags, 'reasoning', ['low', 'medium', 'high', 'xhigh'] as const);
+
       if (flags['background'] === true) {
         const jobId = enqueueBackground('implement', args, flags, process.cwd());
         console.log(JSON.stringify({ status: 'queued', jobId }));
         break;
       }
       const task = args.join(' ') || flagString(flags, 'task') || '';
-      const reasoning = flagString(flags, 'reasoning');
       await runImplement(task, process.cwd(), {
         model: flagString(flags, 'model'),
-        reasoning:
-          reasoning === 'low' || reasoning === 'medium' || reasoning === 'high'
-            ? reasoning
-            : undefined,
+        reasoning,
         timeout: flagNumber(flags, 'timeout'),
         worktree: flags['no-worktree'] !== true,
         allowShell: flags['allow-shell'] === true,
         allowUrl: flags['allow-url'] === true,
         minQuota: flagNumber(flags, 'min-quota'),
         writePath: flagString(flags, 'write'),
+      });
+      break;
+    }
+
+    case 'review': {
+      // Validate enums up-front so typos error loudly instead of silently
+      // falling back to defaults.
+      const validScopes = ['auto', 'working-tree', 'branch'] as const;
+      const validEfforts = ['low', 'medium', 'high', 'xhigh'] as const;
+      const scope = flagEnum<ReviewScope>(flags, 'scope', validScopes);
+      const reasoning = flagEnum(flags, 'reasoning', validEfforts);
+
+      if (flags['background'] === true) {
+        const jobId = enqueueBackground('review', args, flags, process.cwd());
+        console.log(JSON.stringify({ status: 'queued', jobId }));
+        break;
+      }
+      await runReview(process.cwd(), {
+        adversarial: flags['adversarial'] === true,
+        scope,
+        base: flagString(flags, 'base'),
+        focusText: args.join(' '),
+        model: flagString(flags, 'model'),
+        reasoning,
+        timeout: flagNumber(flags, 'timeout'),
+        minQuota: flagNumber(flags, 'min-quota'),
       });
       break;
     }

@@ -5895,6 +5895,15 @@ function recordSnapshot(stateDir, quotas) {
   (0, import_node_fs2.writeFileSync)(snapshotPath(stateDir), JSON.stringify(merged, null, 2), "utf-8");
   return merged;
 }
+function isPremiumModel(modelId) {
+  if (!modelId) return true;
+  const id = modelId.toLowerCase();
+  if (id.startsWith("claude-opus-")) return true;
+  if (id.startsWith("claude-sonnet-")) return false;
+  if (id.startsWith("claude-haiku-")) return false;
+  if (id.startsWith("gpt-")) return false;
+  return true;
+}
 function evaluateGate(snapshot, opts) {
   if (!snapshot || Object.keys(snapshot.quotas).length === 0) {
     return { ok: true, reason: "no_cache" };
@@ -5931,28 +5940,57 @@ function evaluateGate(snapshot, opts) {
   const warning = ageMs > staleMs ? `Quota snapshot is ${Math.round(ageMs / 1e3)}s old; may be out of date.` : void 0;
   return warning ? { ok: true, reason: "available", warning } : { ok: true, reason: "available" };
 }
+var POOL_LABELS = {
+  premium_interactions: "Premium requests",
+  chat: "Chat",
+  completions: "Completions"
+};
+function labelFor(id) {
+  if (POOL_LABELS[id]) return POOL_LABELS[id];
+  return id.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 function summarize(snapshot) {
-  if (!snapshot) return {};
-  const entries = Object.values(snapshot.quotas);
-  if (entries.length === 0) return {};
-  const metered = entries.filter(
-    (q) => !q.isUnlimitedEntitlement && q.entitlementRequests > 0
-  );
-  if (metered.length === 0) return { unlimited: true };
+  if (!snapshot) return { pools: [], allUnlimited: false };
+  const entries = Object.entries(snapshot.quotas);
+  if (entries.length === 0) return { pools: [], allUnlimited: false };
+  const pools = entries.map(([id, q]) => {
+    const isMetered = !q.isUnlimitedEntitlement && q.entitlementRequests > 0;
+    if (!isMetered) {
+      return { id, label: labelFor(id), unlimited: true };
+    }
+    const remaining = Math.max(0, q.entitlementRequests - q.usedRequests);
+    return {
+      id,
+      label: labelFor(id),
+      unlimited: false,
+      used: q.usedRequests,
+      total: q.entitlementRequests,
+      remaining,
+      remainingPercentage: q.remainingPercentage,
+      resetAt: q.resetDate || void 0
+    };
+  });
+  const metered = pools.filter((p) => !p.unlimited);
+  if (metered.length === 0) {
+    return { pools, allUnlimited: true, unlimited: true };
+  }
   let minRemaining = Number.POSITIVE_INFINITY;
   let minPct = 100;
   let tightestReset = "";
   let tightestEntitlement = 0;
-  for (const q of metered) {
-    const remaining = Math.max(0, q.entitlementRequests - q.usedRequests);
-    if (remaining < minRemaining) {
-      minRemaining = remaining;
-      tightestReset = q.resetDate;
-      tightestEntitlement = q.entitlementRequests;
+  for (const p of metered) {
+    if (p.remaining !== void 0 && p.remaining < minRemaining) {
+      minRemaining = p.remaining;
+      tightestReset = p.resetAt ?? "";
+      tightestEntitlement = p.total ?? 0;
     }
-    if (q.remainingPercentage < minPct) minPct = q.remainingPercentage;
+    if (p.remainingPercentage !== void 0 && p.remainingPercentage < minPct) {
+      minPct = p.remainingPercentage;
+    }
   }
   return {
+    pools,
+    allUnlimited: false,
     premium: minRemaining === Number.POSITIVE_INFINITY ? void 0 : minRemaining,
     entitlement: tightestEntitlement || void 0,
     percentage: minPct,
@@ -5976,21 +6014,34 @@ function renderQuotaBar(q, haveSnapshot) {
   if (!haveSnapshot) {
     return ["- No snapshot yet. One will be captured on the next `implement` run."];
   }
-  if (q.unlimited) {
-    return ["- Unlimited entitlement."];
+  if (q.allUnlimited && q.pools.length > 0) {
+    return [`- Unlimited entitlement (${q.pools.map((p) => p.label).join(", ")}).`];
   }
+  if (q.pools.length === 0) {
+    return ["- No quota information reported by Copilot yet."];
+  }
+  const metered = q.pools.filter((p) => !p.unlimited);
+  const unlimited = q.pools.filter((p) => p.unlimited);
   const lines = [];
-  const remainingPct = typeof q.percentage === "number" ? q.percentage : 0;
-  const usedPct = 100 - remainingPct;
-  lines.push(`Usage      ${renderBar(usedPct)}  ${usedPct.toFixed(1)}%`);
-  if (q.premium !== void 0) {
-    const total = q.entitlement ?? "?";
-    lines.push(`Remaining  ${q.premium} / ${total}  premium requests`);
+  for (const p of metered) {
+    const remainingPct = p.remainingPercentage ?? 0;
+    const usedPct = 100 - remainingPct;
+    const total = p.total ?? "?";
+    const remaining = p.remaining ?? 0;
+    lines.push(`${p.label}`);
+    lines.push(`  Usage      ${renderBar(usedPct)}  ${usedPct.toFixed(1)}%`);
+    lines.push(`  Remaining  ${remaining} / ${total}`);
+    if (p.resetAt) {
+      const days = daysUntil(p.resetAt);
+      const suffix = days === null ? "" : days === 0 ? "  (resets today)" : `  (in ~${days} days)`;
+      lines.push(`  Resets     ${p.resetAt}${suffix}`);
+    }
+    lines.push("");
   }
-  if (q.resetAt) {
-    const days = daysUntil(q.resetAt);
-    const suffix = days === null ? "" : days === 0 ? "  (resets today)" : `  (in ~${days} days)`;
-    lines.push(`Resets     ${q.resetAt}${suffix}`);
+  if (lines[lines.length - 1] === "") lines.pop();
+  if (unlimited.length > 0) {
+    if (lines.length > 0) lines.push("");
+    lines.push(`Unlimited: ${unlimited.map((p) => p.label).join(", ")}`);
   }
   return lines;
 }
@@ -6238,7 +6289,7 @@ async function runSetup(options = {}) {
   lines.push("");
   lines.push("### Quota");
   const haveSnapshot = !!(report.quota && (report.quota.premium !== void 0 || report.quota.unlimited));
-  lines.push(...renderQuotaBar(report.quota ?? {}, haveSnapshot));
+  lines.push(...renderQuotaBar(report.quota ?? { pools: [], allUnlimited: false }, haveSnapshot));
   lines.push("");
   lines.push("### Housekeeping");
   lines.push(`- Worktrees pruned: ${pruneReport.worktreesPruned ? "yes" : "skipped (not a git repo or prune failed)"}`);
@@ -6263,11 +6314,12 @@ function emit(options, report) {
 }
 
 // src/commands/implement.ts
-var import_node_fs5 = require("node:fs");
+var import_node_fs6 = require("node:fs");
 var import_node_path6 = require("node:path");
 init_state();
 
 // src/lib/permission.ts
+var import_node_fs5 = require("node:fs");
 var import_node_path5 = require("node:path");
 function approved() {
   return { kind: "approved" };
@@ -6275,10 +6327,21 @@ function approved() {
 function denied(feedback) {
   return { kind: "denied-interactively-by-user", feedback };
 }
+function canonicalize(p) {
+  try {
+    return (0, import_node_fs5.realpathSync)(p);
+  } catch {
+    const parent = (0, import_node_path5.dirname)(p);
+    if (parent === p) return (0, import_node_path5.resolve)(p);
+    return (0, import_node_path5.resolve)(canonicalize(parent), p.slice(parent.length).replace(/^[\\/]+/, ""));
+  }
+}
 function isPathInside(child, parent) {
-  const c = (0, import_node_path5.resolve)(child);
-  const p = (0, import_node_path5.resolve)(parent);
-  return c === p || c.startsWith(p + "/");
+  const c = canonicalize((0, import_node_path5.resolve)(child));
+  const p = canonicalize((0, import_node_path5.resolve)(parent));
+  if (c === p) return true;
+  const rel = (0, import_node_path5.relative)(p, c);
+  return rel !== "" && !rel.startsWith("..") && !(0, import_node_path5.isAbsolute)(rel);
 }
 function makePermissionHandler(opts) {
   return (request) => {
@@ -6286,11 +6349,26 @@ function makePermissionHandler(opts) {
     switch (kind) {
       case "read": {
         const path = request.path ?? "";
+        if (opts.readOnly) {
+          if (!path) {
+            opts.appendLog("permission.read DENIED (read-only mode): empty path");
+            return denied("Permission request missing path.");
+          }
+          const absolute = path.startsWith("/") ? path : (0, import_node_path5.resolve)(opts.worktreePath, path);
+          if (!isPathInside(absolute, opts.worktreePath)) {
+            opts.appendLog(`permission.read DENIED (outside worktree): ${absolute}`);
+            return denied(`Reads outside the review target (${opts.worktreePath}) are not permitted.`);
+          }
+        }
         opts.appendLog(`permission.read approved: ${path}`);
         return approved();
       }
       case "write": {
         const fileName = request.fileName ?? "";
+        if (opts.readOnly) {
+          opts.appendLog(`permission.write DENIED (read-only mode): ${fileName}`);
+          return denied("This Copilot session is read-only (review mode). File writes are not permitted.");
+        }
         if (!fileName) {
           opts.appendLog("permission.write denied: no fileName provided");
           return denied("Permission request missing fileName.");
@@ -6305,6 +6383,10 @@ function makePermissionHandler(opts) {
       }
       case "mcp": {
         const { serverName, toolName, readOnly } = request;
+        if (opts.readOnly && readOnly !== true) {
+          opts.appendLog(`permission.mcp DENIED (read-only mode): ${serverName}/${toolName} (readOnly=${readOnly ?? "unknown"})`);
+          return denied(`MCP tool ${serverName}/${toolName} is not marked read-only; not permitted in this Copilot review session.`);
+        }
         opts.appendLog(`permission.mcp approved: ${serverName}/${toolName} (readOnly=${readOnly ?? false})`);
         return approved();
       }
@@ -6759,11 +6841,654 @@ async function runImplement(task, cwd, options = {}) {
   const envelopeJson = emit2(envelope);
   if (options.writePath) {
     const outPath = (0, import_node_path6.resolve)(cwd, options.writePath);
-    (0, import_node_fs5.mkdirSync)((0, import_node_path6.dirname)(outPath), { recursive: true });
-    (0, import_node_fs5.writeFileSync)(outPath, envelopeJson + "\n", "utf-8");
+    (0, import_node_fs6.mkdirSync)((0, import_node_path6.dirname)(outPath), { recursive: true });
+    (0, import_node_fs6.writeFileSync)(outPath, envelopeJson + "\n", "utf-8");
     progress(`Report saved to ${outPath}`);
   }
   log(`implement done: branch=${envelope.branch ?? "none"} files=${envelope.filesModified.length} premium=${envelope.premiumRequests}`);
+  progress(`Job log: ${jobLogPath(stateDir, jobId)}`);
+}
+
+// src/commands/review.ts
+init_state();
+
+// src/lib/git.ts
+var import_node_child_process3 = require("node:child_process");
+var import_node_fs7 = require("node:fs");
+var import_node_path7 = require("node:path");
+var MAX_UNTRACKED_BYTES = 24 * 1024;
+var DEFAULT_INLINE_DIFF_MAX_FILES = 2;
+var DEFAULT_INLINE_DIFF_MAX_BYTES = 256 * 1024;
+var SELF_COLLECT_BUFFER_BYTES = 64 * 1024 * 1024;
+function gitDiffTolerant(cwd, args) {
+  const result = git(cwd, args, SELF_COLLECT_BUFFER_BYTES);
+  if (result.error?.code === "ENOBUFS") {
+    return { stdout: "", overflow: true };
+  }
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(`git ${args.join(" ")} failed: ${result.stderr.trim() || `exit ${result.status}`}`);
+  }
+  return { stdout: result.stdout, overflow: false };
+}
+function truncateUtf8(s, maxBytes) {
+  const buf = Buffer.from(s, "utf8");
+  if (buf.length <= maxBytes) return { text: s, truncated: false };
+  let cut = buf.subarray(0, maxBytes).toString("utf8");
+  const lastNl = cut.lastIndexOf("\n");
+  if (lastNl > 0) cut = cut.slice(0, lastNl);
+  return { text: cut, truncated: true };
+}
+function git(cwd, args, maxBuffer) {
+  const result = (0, import_node_child_process3.spawnSync)("git", args, {
+    cwd,
+    encoding: "utf8",
+    maxBuffer,
+    windowsHide: true
+  });
+  return {
+    status: result.status ?? 0,
+    stdout: result.stdout ?? "",
+    stderr: result.stderr ?? "",
+    error: result.error ?? null
+  };
+}
+function gitChecked(cwd, args, maxBuffer) {
+  const result = git(cwd, args, maxBuffer);
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(`git ${args.join(" ")} failed: ${result.stderr.trim() || `exit ${result.status}`}`);
+  }
+  return result;
+}
+function isProbablyText(buffer) {
+  const sample = buffer.subarray(0, Math.min(buffer.length, 4096));
+  for (const value of sample) {
+    if (value === 0) return false;
+  }
+  return true;
+}
+function listUniqueFiles(...groups) {
+  return [...new Set(groups.flat().filter(Boolean))].sort();
+}
+function measureGitOutputBytes(cwd, args, maxBytes) {
+  const result = git(cwd, args, maxBytes + 1);
+  if (result.error && result.error.code === "ENOBUFS") return maxBytes + 1;
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(`git ${args.join(" ")} failed`);
+  return Buffer.byteLength(result.stdout, "utf8");
+}
+function measureCombinedGitOutputBytes(cwd, argSets, maxBytes) {
+  let total = 0;
+  for (const args of argSets) {
+    const remaining = maxBytes - total;
+    if (remaining < 0) return maxBytes + 1;
+    total += measureGitOutputBytes(cwd, args, remaining);
+    if (total > maxBytes) return total;
+  }
+  return total;
+}
+function buildBranchComparison(cwd, baseRef) {
+  const mergeBase = gitChecked(cwd, ["merge-base", "HEAD", baseRef]).stdout.trim();
+  return { mergeBase, commitRange: `${mergeBase}..HEAD` };
+}
+function ensureGitRepository(cwd) {
+  const result = git(cwd, ["rev-parse", "--show-toplevel"]);
+  if (result.error?.code === "ENOENT") throw new Error("git is not installed. Install Git and retry.");
+  if (result.status !== 0) throw new Error("This command must run inside a Git repository.");
+  return result.stdout.trim();
+}
+function getRepoRoot(cwd) {
+  return gitChecked(cwd, ["rev-parse", "--show-toplevel"]).stdout.trim();
+}
+function detectDefaultBranch(cwd) {
+  const symbolic = git(cwd, ["symbolic-ref", "refs/remotes/origin/HEAD"]);
+  if (symbolic.status === 0) {
+    const head = symbolic.stdout.trim();
+    if (head.startsWith("refs/remotes/")) return head.replace("refs/remotes/", "");
+  }
+  for (const candidate of ["main", "master", "trunk"]) {
+    if (git(cwd, ["show-ref", "--verify", "--quiet", `refs/heads/${candidate}`]).status === 0) return candidate;
+    if (git(cwd, ["show-ref", "--verify", "--quiet", `refs/remotes/origin/${candidate}`]).status === 0) return `origin/${candidate}`;
+  }
+  throw new Error("Unable to detect the repository default branch. Pass --base <ref> or use --scope working-tree.");
+}
+function getCurrentBranch(cwd) {
+  return gitChecked(cwd, ["branch", "--show-current"]).stdout.trim() || "HEAD";
+}
+function getWorkingTreeState(cwd) {
+  const split = (s) => s.trim().split("\n").filter(Boolean);
+  const staged = split(gitChecked(cwd, ["diff", "--cached", "--name-only"]).stdout);
+  const unstaged = split(gitChecked(cwd, ["diff", "--name-only"]).stdout);
+  const untracked = split(gitChecked(cwd, ["ls-files", "--others", "--exclude-standard"]).stdout);
+  return { staged, unstaged, untracked, isDirty: staged.length > 0 || unstaged.length > 0 || untracked.length > 0 };
+}
+function resolveReviewTarget(cwd, options = {}) {
+  ensureGitRepository(cwd);
+  const requestedScope = options.scope ?? "auto";
+  const baseRef = options.base ?? null;
+  const supported = /* @__PURE__ */ new Set(["auto", "working-tree", "branch"]);
+  if (baseRef) {
+    return { mode: "branch", label: `branch diff against ${baseRef}`, baseRef, explicit: true };
+  }
+  if (requestedScope === "working-tree") {
+    return { mode: "working-tree", label: "working tree diff", explicit: true };
+  }
+  if (!supported.has(requestedScope)) {
+    throw new Error(`Unsupported review scope "${requestedScope}". Use one of: auto, working-tree, branch, or pass --base <ref>.`);
+  }
+  if (requestedScope === "branch") {
+    const detected2 = detectDefaultBranch(cwd);
+    return { mode: "branch", label: `branch diff against ${detected2}`, baseRef: detected2, explicit: true };
+  }
+  const state = getWorkingTreeState(cwd);
+  if (state.isDirty) {
+    return { mode: "working-tree", label: "working tree diff", explicit: false };
+  }
+  const detected = detectDefaultBranch(cwd);
+  return { mode: "branch", label: `branch diff against ${detected}`, baseRef: detected, explicit: false };
+}
+function formatSection(title, body) {
+  return [`## ${title}`, "", body.trim() ? body.trim() : "(none)", ""].join("\n");
+}
+function formatUntrackedFile(cwd, relativePath) {
+  const absolute = (0, import_node_path7.join)(cwd, relativePath);
+  if (!(0, import_node_fs7.existsSync)(absolute)) return `### ${relativePath}
+(skipped: missing)`;
+  let stat;
+  try {
+    stat = (0, import_node_fs7.statSync)(absolute);
+  } catch {
+    return `### ${relativePath}
+(skipped: unreadable)`;
+  }
+  if (stat.isDirectory()) return `### ${relativePath}
+(skipped: directory)`;
+  if (stat.size > MAX_UNTRACKED_BYTES) return `### ${relativePath}
+(skipped: ${stat.size} bytes exceeds ${MAX_UNTRACKED_BYTES} byte limit)`;
+  let buffer;
+  try {
+    buffer = (0, import_node_fs7.readFileSync)(absolute);
+  } catch {
+    return `### ${relativePath}
+(skipped: unreadable)`;
+  }
+  if (!isProbablyText(buffer)) return `### ${relativePath}
+(skipped: binary file)`;
+  return [`### ${relativePath}`, "```", buffer.toString("utf8").trimEnd(), "```"].join("\n");
+}
+function collectWorkingTreeContext(cwd, state, includeDiff, truncatedDiffBytes) {
+  const status = gitChecked(cwd, ["status", "--short", "--untracked-files=all"]).stdout.trim();
+  const changedFiles = listUniqueFiles(state.staged, state.unstaged, state.untracked);
+  let parts;
+  if (includeDiff) {
+    parts = [
+      formatSection("Git Status", status),
+      formatSection("Staged Diff", gitChecked(cwd, ["diff", "--cached", "--binary", "--no-ext-diff", "--submodule=diff"]).stdout),
+      formatSection("Unstaged Diff", gitChecked(cwd, ["diff", "--binary", "--no-ext-diff", "--submodule=diff"]).stdout),
+      // Inline path: include full untracked file bodies (small diffs only).
+      formatSection("Untracked Files", state.untracked.map((f) => formatUntrackedFile(cwd, f)).join("\n\n"))
+    ];
+  } else {
+    const staged = gitDiffTolerant(cwd, ["diff", "--cached", "--no-ext-diff", "--submodule=short"]);
+    const unstaged = gitDiffTolerant(cwd, ["diff", "--no-ext-diff", "--submodule=short"]);
+    const overflow = staged.overflow || unstaged.overflow;
+    const combined = [staged.stdout, unstaged.stdout].filter(Boolean).join("\n");
+    const trimmed = truncateUtf8(combined, truncatedDiffBytes);
+    let diffBlock = trimmed.truncated ? `${trimmed.text}
+
+... (diff truncated; read individual files for the rest)` : trimmed.text;
+    if (overflow) {
+      diffBlock = `(diff exceeded ${SELF_COLLECT_BUFFER_BYTES} bytes; inline omitted \u2014 use the read tool on the changed files listed above)
+
+${diffBlock}`;
+    }
+    parts = [
+      formatSection("Git Status", status),
+      formatSection("Staged Diff Stat", gitChecked(cwd, ["diff", "--shortstat", "--cached"]).stdout.trim()),
+      formatSection("Unstaged Diff Stat", gitChecked(cwd, ["diff", "--shortstat"]).stdout.trim()),
+      formatSection("Changed Files", changedFiles.join("\n")),
+      formatSection("Truncated Diff", diffBlock),
+      formatSection("Untracked Files", state.untracked.join("\n"))
+    ];
+  }
+  return {
+    mode: "working-tree",
+    summary: `Reviewing ${state.staged.length} staged, ${state.unstaged.length} unstaged, and ${state.untracked.length} untracked file(s).`,
+    content: parts.join("\n"),
+    changedFiles
+  };
+}
+function collectBranchContext(cwd, baseRef, comparison, includeDiff, truncatedDiffBytes) {
+  const currentBranch = getCurrentBranch(cwd);
+  const changedFiles = gitChecked(cwd, ["diff", "--name-only", comparison.commitRange]).stdout.trim().split("\n").filter(Boolean);
+  const log = gitChecked(cwd, ["log", "--oneline", "--decorate", comparison.commitRange]).stdout.trim();
+  const stat = gitChecked(cwd, ["diff", "--stat", comparison.commitRange]).stdout.trim();
+  let parts;
+  if (includeDiff) {
+    parts = [
+      formatSection("Commit Log", log),
+      formatSection("Diff Stat", stat),
+      formatSection("Branch Diff", gitChecked(cwd, ["diff", "--binary", "--no-ext-diff", "--submodule=diff", comparison.commitRange]).stdout)
+    ];
+  } else {
+    const branchDiff = gitDiffTolerant(cwd, ["diff", "--no-ext-diff", "--submodule=short", comparison.commitRange]);
+    const trimmed = truncateUtf8(branchDiff.stdout, truncatedDiffBytes);
+    let diffBlock = trimmed.truncated ? `${trimmed.text}
+
+... (diff truncated; read individual files for the rest)` : trimmed.text;
+    if (branchDiff.overflow) {
+      diffBlock = `(diff exceeded ${SELF_COLLECT_BUFFER_BYTES} bytes; inline omitted \u2014 use the read tool on the changed files listed above)
+
+${diffBlock}`;
+    }
+    parts = [
+      formatSection("Commit Log", log),
+      formatSection("Diff Stat", stat),
+      formatSection("Changed Files", changedFiles.join("\n")),
+      formatSection("Truncated Diff", diffBlock)
+    ];
+  }
+  return {
+    mode: "branch",
+    summary: `Reviewing branch ${currentBranch} against ${baseRef} from merge-base ${comparison.mergeBase}.`,
+    content: parts.join("\n"),
+    changedFiles
+  };
+}
+function collectReviewContext(cwd, target, options = {}) {
+  const repoRoot = getRepoRoot(cwd);
+  const branch = getCurrentBranch(repoRoot);
+  const maxInlineFiles = options.maxInlineFiles ?? DEFAULT_INLINE_DIFF_MAX_FILES;
+  const maxInlineDiffBytes = options.maxInlineDiffBytes ?? DEFAULT_INLINE_DIFF_MAX_BYTES;
+  let details;
+  let includeDiff;
+  let diffBytes;
+  if (target.mode === "working-tree") {
+    const state = getWorkingTreeState(repoRoot);
+    diffBytes = measureCombinedGitOutputBytes(
+      repoRoot,
+      [
+        ["diff", "--cached", "--binary", "--no-ext-diff", "--submodule=diff"],
+        ["diff", "--binary", "--no-ext-diff", "--submodule=diff"]
+      ],
+      maxInlineDiffBytes
+    );
+    const fileCount = listUniqueFiles(state.staged, state.unstaged, state.untracked).length;
+    includeDiff = options.includeDiff ?? (fileCount <= maxInlineFiles && diffBytes <= maxInlineDiffBytes);
+    details = collectWorkingTreeContext(repoRoot, state, includeDiff, maxInlineDiffBytes);
+  } else {
+    if (!target.baseRef) throw new Error("Branch target requires baseRef.");
+    const comparison = buildBranchComparison(repoRoot, target.baseRef);
+    const fileCount = gitChecked(repoRoot, ["diff", "--name-only", comparison.commitRange]).stdout.trim().split("\n").filter(Boolean).length;
+    diffBytes = measureGitOutputBytes(
+      repoRoot,
+      ["diff", "--binary", "--no-ext-diff", "--submodule=diff", comparison.commitRange],
+      maxInlineDiffBytes
+    );
+    includeDiff = options.includeDiff ?? (fileCount <= maxInlineFiles && diffBytes <= maxInlineDiffBytes);
+    details = collectBranchContext(repoRoot, target.baseRef, comparison, includeDiff, maxInlineDiffBytes);
+  }
+  const collectionGuidance = includeDiff ? "Use the repository context below as primary evidence." : options.shellAvailable ? "The repository context below is a lightweight summary. Inspect the target diff yourself with read-only git commands before finalizing findings." : 'The repository context below is a lightweight summary because the diff is too large to inline. Shell execution is disabled. Use the read tool to open individual changed files listed under "Changed Files" and ground findings in their actual contents before finalizing.';
+  return {
+    cwd: repoRoot,
+    repoRoot,
+    branch,
+    target,
+    mode: details.mode,
+    summary: details.summary,
+    content: details.content,
+    changedFiles: details.changedFiles,
+    fileCount: details.changedFiles.length,
+    diffBytes,
+    inputMode: includeDiff ? "inline-diff" : "self-collect",
+    collectionGuidance
+  };
+}
+
+// src/lib/review-prompts.ts
+var STANDARD = `<role>
+You are a careful, technically rigorous code reviewer.
+Your job is to find real defects in the change provided.
+</role>
+
+<task>
+Review the repository context below.
+Target: {{TARGET_LABEL}}
+{{USER_FOCUS_BLOCK}}
+</task>
+
+<focus_areas>
+Prioritize material defects:
+- correctness bugs (off-by-one, null deref, wrong branch taken)
+- error handling gaps and unhandled failure paths
+- concurrency, ordering, and re-entrancy issues
+- input validation and trust boundaries
+- resource leaks and lifecycle bugs
+- regressions to existing behavior
+- security: auth, permissions, injection, data exposure
+</focus_areas>
+
+<finding_bar>
+Report only material findings. Skip style nits, naming preferences, and speculative concerns.
+Each finding should answer:
+1. What is wrong?
+2. Where is it (file + line range)?
+3. Why does it fail?
+4. What concrete change would fix it?
+</finding_bar>
+
+<output_format>
+Return markdown. Structure:
+
+# Review Summary
+One terse paragraph: ship / needs-attention / blocker, plus the overall risk read.
+
+## Findings
+For each finding, a level-3 heading with the file path and line range, then:
+- **Issue**: one sentence
+- **Why it matters**: one to three sentences
+- **Fix**: concrete recommendation
+
+## Notes
+Optional. Anything notable that is not a finding (e.g., test coverage gaps, follow-up work).
+
+If there are no material findings, say so directly under "Review Summary" and skip "Findings".
+</output_format>
+
+<grounding_rules>
+Ground every finding in the repository context or in evidence you can collect with read-only commands.
+Do not invent files, line numbers, or behavior you cannot support.
+Keep confidence honest \u2014 if a conclusion depends on inference, say so.
+</grounding_rules>
+
+<collection_guidance>
+{{REVIEW_COLLECTION_GUIDANCE}}
+</collection_guidance>
+
+<repository_context>
+{{REVIEW_INPUT}}
+</repository_context>
+`;
+var ADVERSARIAL = `<role>
+You are performing an adversarial software review.
+Your job is to break confidence in the change, not to validate it.
+</role>
+
+<task>
+Review the repository context below as if you are trying to find the strongest reasons this change should not ship yet.
+Target: {{TARGET_LABEL}}
+{{USER_FOCUS_BLOCK}}
+</task>
+
+<operating_stance>
+Default to skepticism.
+Assume the change can fail in subtle, high-cost, or user-visible ways until the evidence says otherwise.
+Do not give credit for good intent, partial fixes, or likely follow-up work.
+If something only works on the happy path, treat that as a real weakness.
+</operating_stance>
+
+<attack_surface>
+Prioritize the kinds of failures that are expensive, dangerous, or hard to detect:
+- auth, permissions, tenant isolation, and trust boundaries
+- data loss, corruption, duplication, and irreversible state changes
+- rollback safety, retries, partial failure, and idempotency gaps
+- race conditions, ordering assumptions, stale state, and re-entrancy
+- empty-state, null, timeout, and degraded dependency behavior
+- version skew, schema drift, migration hazards, and compatibility regressions
+- observability gaps that would hide failure or make recovery harder
+- design choices that work today but constrain future changes
+</attack_surface>
+
+<review_method>
+Actively try to disprove the change.
+Look for violated invariants, missing guards, unhandled failure paths, and assumptions that stop being true under stress.
+Trace how bad inputs, retries, concurrent actions, or partially completed operations move through the code.
+If the user supplied a focus area, weight it heavily, but still report any other material issue you can defend.
+Question the design itself: is this the right approach, or is it a local optimum that will hurt later?
+</review_method>
+
+<finding_bar>
+Report only material findings.
+Do not include style feedback, naming feedback, low-value cleanup, or speculative concerns without evidence.
+A finding should answer:
+1. What can go wrong?
+2. Why is this code path vulnerable?
+3. What is the likely impact?
+4. What concrete change would reduce the risk?
+</finding_bar>
+
+<output_format>
+Return markdown. Structure:
+
+# Adversarial Review
+One paragraph: ship / needs-attention / no-ship, written as a terse risk verdict, not a neutral recap.
+
+## Findings
+For each finding, a level-3 heading with the file path and line range, then:
+- **Risk**: what fails, in one sentence
+- **Why it is plausible**: defensible reasoning grounded in the code
+- **Impact**: concrete consequence (data loss, auth bypass, regression, etc.)
+- **Mitigation**: what change would reduce the risk
+
+## Design Concerns
+Optional. Higher-level concerns about the chosen approach, tradeoffs, or assumptions that may not hold.
+</output_format>
+
+<grounding_rules>
+Be aggressive, but stay grounded.
+Every finding must be defensible from the provided repository context or tool outputs.
+Do not invent files, lines, code paths, incidents, attack chains, or runtime behavior you cannot support.
+If a conclusion depends on an inference, state that explicitly and keep the confidence honest.
+</grounding_rules>
+
+<calibration_rules>
+Prefer one strong finding over several weak ones.
+Do not dilute serious issues with filler.
+If the change looks safe, say so directly and return no findings.
+</calibration_rules>
+
+<collection_guidance>
+{{REVIEW_COLLECTION_GUIDANCE}}
+</collection_guidance>
+
+<repository_context>
+{{REVIEW_INPUT}}
+</repository_context>
+`;
+function interpolate(template, vars) {
+  return template.replace(/\{\{([A-Z_]+)\}\}/g, (_, key) => Object.prototype.hasOwnProperty.call(vars, key) ? vars[key] : "");
+}
+function buildReviewPrompt(kind, vars) {
+  const template = kind === "adversarial" ? ADVERSARIAL : STANDARD;
+  const focusBlock = vars.focusText.trim() ? `User focus: ${vars.focusText.trim()}` : "No extra focus provided.";
+  return interpolate(template, {
+    TARGET_LABEL: vars.context.target.label,
+    USER_FOCUS_BLOCK: focusBlock,
+    REVIEW_COLLECTION_GUIDANCE: vars.context.collectionGuidance,
+    REVIEW_INPUT: vars.context.content
+  });
+}
+
+// src/commands/review.ts
+var DEFAULT_TIMEOUT_MS2 = 30 * 60 * 1e3;
+var DEFAULT_MODEL_STANDARD = "gpt-5.3-codex";
+var DEFAULT_MODEL_ADVERSARIAL = "gpt-5.4";
+var DEFAULT_EFFORT_STANDARD = "medium";
+var DEFAULT_EFFORT_ADVERSARIAL = "high";
+function progressFactory2() {
+  return (message) => {
+    const time = (/* @__PURE__ */ new Date()).toLocaleTimeString("en-US", { hour12: false });
+    process.stderr.write(`[${time}] ${message}
+`);
+  };
+}
+async function runReview(cwd, options = {}) {
+  const progress = progressFactory2();
+  const kind = options.adversarial ? "adversarial" : "standard";
+  const model = options.model ?? (kind === "adversarial" ? DEFAULT_MODEL_ADVERSARIAL : DEFAULT_MODEL_STANDARD);
+  const reasoning = options.reasoning ?? (kind === "adversarial" ? DEFAULT_EFFORT_ADVERSARIAL : DEFAULT_EFFORT_STANDARD);
+  const timeout = options.timeout ?? DEFAULT_TIMEOUT_MS2;
+  const minQuota = options.minQuota ?? 1;
+  const stateDir = resolveStateDir(cwd);
+  const jobId = options.jobId ?? generateJobId();
+  const log = (msg) => appendLog(stateDir, jobId, msg);
+  log(`review start: kind=${kind} model=${model} effort=${reasoning} scope=${options.scope ?? "auto"} base=${options.base ?? "(auto)"}`);
+  const target = resolveReviewTarget(cwd, { scope: options.scope, base: options.base });
+  const context = collectReviewContext(cwd, target, { shellAvailable: false });
+  if (context.fileCount === 0) {
+    process.stdout.write(`# Review Summary
+
+No changes to review under ${context.target.label}.
+`);
+    log("review aborted: empty target");
+    return;
+  }
+  progress(`Target: ${context.target.label} \u2014 ${context.fileCount} file(s), ~${context.diffBytes}B diff (${context.inputMode}).`);
+  const snapshot = readSnapshot(stateDir);
+  if (isPremiumModel(model)) {
+    const gate = evaluateGate(snapshot, { minRemaining: minQuota });
+    if (!gate.ok) {
+      log(`quota blocked: remaining=${gate.remaining} resetAt=${gate.resetAt}`);
+      throw new Error(`Quota exhausted \u2014 review not started. Resets at ${gate.resetAt || "unknown"}.`);
+    }
+    if (gate.ok && "warning" in gate && gate.warning) progress(gate.warning);
+  } else {
+    log(`quota gate skipped: model ${model} is not premium-metered`);
+  }
+  const prompt = buildReviewPrompt(kind, { context, focusText: options.focusText ?? "" });
+  log(`prompt built: ${prompt.length} chars`);
+  const client = new CopilotClient({ cwd: context.repoRoot, env: process.env });
+  let cleanupDone = false;
+  let aborted = false;
+  const finalize = async (errorMessage) => {
+    if (cleanupDone) return;
+    cleanupDone = true;
+    try {
+      await client.forceStop();
+    } catch {
+    }
+    if (errorMessage) {
+      process.stderr.write(`Review failed: ${errorMessage}
+`);
+    }
+  };
+  const onSignal = async () => {
+    if (aborted) return;
+    aborted = true;
+    progress("Received interrupt; aborting review.");
+    log("interrupt");
+    await finalize("Interrupted by signal");
+    process.exit(130);
+  };
+  process.on("SIGINT", () => void onSignal());
+  process.on("SIGTERM", () => void onSignal());
+  try {
+    await client.start();
+  } catch (err) {
+    const msg = `Failed to start Copilot CLI: ${err.message}`;
+    await finalize(msg);
+    throw new Error(msg);
+  }
+  const auth = await checkAuth(client);
+  if (!auth.ok) {
+    log(`auth failed: ${auth.message}`);
+    const msg = `Not authenticated: ${auth.message}`;
+    await finalize(msg);
+    await client.stop().catch(() => {
+    });
+    throw new Error(msg);
+  }
+  log(`auth ok: ${auth.authType}${auth.login ? ` as ${auth.login}` : ""}`);
+  const permissionHandler = makePermissionHandler({
+    allowShell: false,
+    allowUrl: false,
+    worktreePath: context.repoRoot,
+    appendLog: log,
+    readOnly: true
+  });
+  let session;
+  try {
+    session = await client.createSession({
+      clientName: `${CLIENT_NAME}/${PLUGIN_VERSION}`,
+      model,
+      reasoningEffort: reasoning,
+      workingDirectory: context.repoRoot,
+      infiniteSessions: { enabled: false },
+      onPermissionRequest: permissionHandler
+    });
+  } catch (err) {
+    const msg = `Failed to create Copilot session: ${err.message}`;
+    log(msg);
+    await client.stop().catch((e) => log(`client.stop warn: ${e.message}`));
+    await finalize(msg);
+    throw new Error(msg);
+  }
+  const stream = attachStream({ session, stateDir, appendLog: log, progress });
+  let completionResult = null;
+  let shutdownResult = null;
+  let timedOut = false;
+  let sessionTorn = false;
+  const timeoutHandle = setTimeout(() => {
+    timedOut = true;
+    progress(`Timeout after ${timeout}ms \u2014 aborting session.`);
+    log(`timeout ${timeout}ms`);
+    session.abort().catch((e) => log(`abort error: ${e.message}`));
+  }, timeout);
+  const tearDownSession = async () => {
+    if (sessionTorn) return;
+    sessionTorn = true;
+    clearTimeout(timeoutHandle);
+    await session.disconnect().catch((e) => log(`disconnect warn: ${e.message}`));
+    stream.dispose();
+    await client.stop().catch((e) => log(`client.stop warn: ${e.message}`));
+  };
+  try {
+    progress(`Sending ${kind} review prompt to Copilot (model=${model}, effort=${reasoning})\u2026`);
+    await session.send({ prompt });
+    completionResult = await stream.completion;
+    progress("Review complete; collecting shutdown metrics.");
+    await session.disconnect().catch((e) => log(`disconnect warn: ${e.message}`));
+    shutdownResult = await Promise.race([
+      stream.shutdown,
+      new Promise((res) => setTimeout(() => res(null), 5e3))
+    ]);
+  } catch (err) {
+    const msg = err.message;
+    log(`session error: ${msg}`);
+    await tearDownSession();
+    await finalize(msg);
+    throw new Error(msg);
+  } finally {
+    await tearDownSession();
+  }
+  const reviewBody = stream.getLastAssistantMessage()?.trim() || completionResult?.summary && completionResult.summary.trim() || "_(Copilot returned an empty review.)_";
+  const success = completionResult?.success !== false && !timedOut;
+  if (!success) {
+    const reason = timedOut ? `Timed out after ${timeout}ms.` : "Review did not complete successfully.";
+    process.stderr.write(`Review failed: ${reason}
+`);
+    process.stdout.write(`# Review Failed
+
+${reason}
+
+${reviewBody}
+`);
+    log(`review failed: ${reason}`);
+    throw new Error(reason);
+  }
+  const quotaRemaining = summarize(readSnapshot(stateDir));
+  const premium = shutdownResult?.totalPremiumRequests ?? 0;
+  const usedModel = shutdownResult?.currentModel ?? model;
+  process.stdout.write(`${reviewBody.trim()}
+`);
+  const poolNote = quotaRemaining.pools.length > 0 ? quotaRemaining.pools.map(
+    (p) => p.unlimited ? `${p.label}=unlimited` : `${p.label}=${p.remaining}/${p.total}`
+  ).join(", ") : "no quota snapshot yet";
+  progress(
+    `Review done \u2014 kind=${kind} model=${usedModel} effort=${reasoning} files=${context.fileCount} premium-used=${premium} | ${poolNote}`
+  );
+  log(`review done: kind=${kind} files=${context.fileCount} premium=${premium} pools=${poolNote}`);
   progress(`Job log: ${jobLogPath(stateDir, jobId)}`);
 }
 
@@ -6916,11 +7641,11 @@ async function runResult(cwd, options = {}) {
 }
 
 // src/commands/background.ts
-var import_node_child_process3 = require("node:child_process");
+var import_node_child_process4 = require("node:child_process");
 init_state();
 function enqueueBackground(command, args, flags, cwd) {
-  if (command !== "implement") {
-    throw new Error(`Background execution is only supported for 'implement', got '${command}'.`);
+  if (command !== "implement" && command !== "review") {
+    throw new Error(`Background execution is only supported for 'implement' or 'review', got '${command}'.`);
   }
   const stateDir = resolveStateDir(cwd);
   const jobId = generateJobId();
@@ -6940,7 +7665,7 @@ function enqueueBackground(command, args, flags, cwd) {
   createJob(stateDir, job);
   appendLog(stateDir, jobId, `Queued for background execution: ${command} "${summary}"`);
   const scriptPath = getScriptPath();
-  const child = (0, import_node_child_process3.spawn)(process.execPath, [scriptPath, "_worker", "--job-id", jobId, "--cwd", cwd], {
+  const child = (0, import_node_child_process4.spawn)(process.execPath, [scriptPath, "_worker", "--job-id", jobId, "--cwd", cwd], {
     cwd,
     env: { ...process.env, COPILOT_COMPANION_SESSION_ID: getSessionId() ?? "" },
     detached: true,
@@ -6995,20 +7720,39 @@ async function runWorker(jobId, cwd) {
     return originalStderrWrite(chunk, ...rest);
   });
   const reasoning = flagString(flags, "reasoning");
-  const implementOpts = {
-    model: flagString(flags, "model"),
-    reasoning: reasoning === "low" || reasoning === "medium" || reasoning === "high" ? reasoning : void 0,
-    timeout: flagNumber(flags, "timeout"),
-    worktree: flags["no-worktree"] !== true,
-    allowShell: flags["allow-shell"] === true,
-    allowUrl: flags["allow-url"] === true,
-    minQuota: flagNumber(flags, "min-quota"),
-    writePath: flagString(flags, "write"),
-    jobId
-  };
+  const validEfforts = ["low", "medium", "high", "xhigh"];
+  const effort = reasoning && validEfforts.includes(reasoning) ? reasoning : void 0;
   try {
-    const task = args.join(" ");
-    await runImplement(task, cwd, implementOpts);
+    if (job.request.command === "review") {
+      const scope = flagString(flags, "scope");
+      const validScopes = ["auto", "working-tree", "branch"];
+      const reviewOpts = {
+        adversarial: flags["adversarial"] === true,
+        scope: scope && validScopes.includes(scope) ? scope : void 0,
+        base: flagString(flags, "base"),
+        focusText: args.join(" "),
+        model: flagString(flags, "model"),
+        reasoning: effort,
+        timeout: flagNumber(flags, "timeout"),
+        minQuota: flagNumber(flags, "min-quota"),
+        jobId
+      };
+      await runReview(cwd, reviewOpts);
+    } else {
+      const implementOpts = {
+        model: flagString(flags, "model"),
+        reasoning: effort,
+        timeout: flagNumber(flags, "timeout"),
+        worktree: flags["no-worktree"] !== true,
+        allowShell: flags["allow-shell"] === true,
+        allowUrl: flags["allow-url"] === true,
+        minQuota: flagNumber(flags, "min-quota"),
+        writePath: flagString(flags, "write"),
+        jobId
+      };
+      const task = args.join(" ");
+      await runImplement(task, cwd, implementOpts);
+    }
     const captured = stdoutChunks.join("").trim();
     updateJob(stateDir, jobId, {
       status: "completed",
@@ -7042,17 +7786,34 @@ function printUsage() {
       "                               [--no-worktree] [--allow-shell] [--allow-url]",
       "                               [--timeout <ms>] [--min-quota <n>]",
       "                               [--background] [--write <path>]",
+      "  copilot-companion review [focus...] [--adversarial] [--base <ref>]",
+      "                           [--scope auto|working-tree|branch]",
+      "                           [--model <id>] [--reasoning <low|medium|high|xhigh>]",
+      "                           [--timeout <ms>] [--min-quota <n>] [--background]",
       "  copilot-companion status [job-id] [--all] [--json]",
       "  copilot-companion result [job-id] [--json]",
       "",
       "Commands:",
       "  setup       Check GitHub Copilot authentication, available models, quota",
       "  implement   Delegate an implementation task to GitHub Copilot",
+      "  review      Run a Copilot code review (markdown output)",
       "  status      Show quota plus background job status",
       "  result      Retrieve a background job's output"
     ].join("\n")
   );
 }
+var BOOLEAN_FLAGS = /* @__PURE__ */ new Set([
+  "adversarial",
+  "all",
+  "allow-shell",
+  "allow-url",
+  "background",
+  "check",
+  "help",
+  "json",
+  "no-worktree",
+  "wait"
+]);
 function parseArgs(argv) {
   const command = argv[0] ?? "help";
   const args = [];
@@ -7060,7 +7821,29 @@ function parseArgs(argv) {
   for (let i = 1; i < argv.length; i++) {
     const arg = argv[i];
     if (arg.startsWith("--")) {
+      const eq = arg.indexOf("=");
+      if (eq !== -1) {
+        const key2 = arg.slice(2, eq);
+        const value = arg.slice(eq + 1);
+        if (BOOLEAN_FLAGS.has(key2)) {
+          const lc = value.toLowerCase();
+          if (lc === "" || lc === "true" || lc === "1" || lc === "yes") {
+            flags[key2] = true;
+          } else if (lc === "false" || lc === "0" || lc === "no") {
+            flags[key2] = false;
+          } else {
+            throw new Error(`Flag --${key2} is boolean and cannot take value "${value}". Use --${key2} or --no-${key2}.`);
+          }
+          continue;
+        }
+        flags[key2] = value;
+        continue;
+      }
       const key = arg.slice(2);
+      if (BOOLEAN_FLAGS.has(key)) {
+        flags[key] = true;
+        continue;
+      }
       const next = argv[i + 1];
       if (next !== void 0 && !next.startsWith("--")) {
         flags[key] = next;
@@ -7084,6 +7867,17 @@ function flagNumber2(flags, key) {
   const n = Number.parseInt(v, 10);
   return Number.isFinite(n) ? n : void 0;
 }
+function flagEnum(flags, key, allowed) {
+  const v = flags[key];
+  if (v === void 0) return void 0;
+  if (typeof v !== "string") {
+    throw new Error(`Flag --${key} requires a value (one of: ${allowed.join(", ")}).`);
+  }
+  if (!allowed.includes(v)) {
+    throw new Error(`Invalid --${key} value "${v}". Expected one of: ${allowed.join(", ")}.`);
+  }
+  return v;
+}
 async function main() {
   const { command, args, flags } = parseArgs(import_node_process.default.argv.slice(2));
   switch (command) {
@@ -7094,22 +7888,44 @@ async function main() {
       });
       break;
     case "implement": {
+      const reasoning = flagEnum(flags, "reasoning", ["low", "medium", "high", "xhigh"]);
       if (flags["background"] === true) {
         const jobId = enqueueBackground("implement", args, flags, import_node_process.default.cwd());
         console.log(JSON.stringify({ status: "queued", jobId }));
         break;
       }
       const task = args.join(" ") || flagString2(flags, "task") || "";
-      const reasoning = flagString2(flags, "reasoning");
       await runImplement(task, import_node_process.default.cwd(), {
         model: flagString2(flags, "model"),
-        reasoning: reasoning === "low" || reasoning === "medium" || reasoning === "high" ? reasoning : void 0,
+        reasoning,
         timeout: flagNumber2(flags, "timeout"),
         worktree: flags["no-worktree"] !== true,
         allowShell: flags["allow-shell"] === true,
         allowUrl: flags["allow-url"] === true,
         minQuota: flagNumber2(flags, "min-quota"),
         writePath: flagString2(flags, "write")
+      });
+      break;
+    }
+    case "review": {
+      const validScopes = ["auto", "working-tree", "branch"];
+      const validEfforts = ["low", "medium", "high", "xhigh"];
+      const scope = flagEnum(flags, "scope", validScopes);
+      const reasoning = flagEnum(flags, "reasoning", validEfforts);
+      if (flags["background"] === true) {
+        const jobId = enqueueBackground("review", args, flags, import_node_process.default.cwd());
+        console.log(JSON.stringify({ status: "queued", jobId }));
+        break;
+      }
+      await runReview(import_node_process.default.cwd(), {
+        adversarial: flags["adversarial"] === true,
+        scope,
+        base: flagString2(flags, "base"),
+        focusText: args.join(" "),
+        model: flagString2(flags, "model"),
+        reasoning,
+        timeout: flagNumber2(flags, "timeout"),
+        minQuota: flagNumber2(flags, "min-quota")
       });
       break;
     }
