@@ -6604,6 +6604,7 @@ function attachStream(opts) {
 
 // src/commands/implement.ts
 var DEFAULT_MODEL2 = "claude-opus-4.6";
+var DEFAULT_EFFORT = "medium";
 var DEFAULT_TIMEOUT_MS = 30 * 60 * 1e3;
 function progressFactory() {
   return (message) => {
@@ -6638,6 +6639,7 @@ async function runImplement(task, cwd, options = {}) {
   const stateDir = resolveStateDir(cwd);
   const jobId = options.jobId ?? generateJobId();
   const model = options.model ?? DEFAULT_MODEL2;
+  const reasoning = options.reasoning ?? DEFAULT_EFFORT;
   const timeout = options.timeout ?? DEFAULT_TIMEOUT_MS;
   const useWorktree = options.worktree !== false;
   const minQuota = options.minQuota ?? 1;
@@ -6740,7 +6742,7 @@ async function runImplement(task, cwd, options = {}) {
   const session = await client.createSession({
     clientName: `${CLIENT_NAME}/${PLUGIN_VERSION}`,
     model,
-    reasoningEffort: options.reasoning,
+    reasoningEffort: reasoning,
     workingDirectory: sessionCwd,
     infiniteSessions: { enabled: false },
     onPermissionRequest: permissionHandler
@@ -7314,8 +7316,8 @@ function buildReviewPrompt(kind, vars) {
 var DEFAULT_TIMEOUT_MS2 = 30 * 60 * 1e3;
 var DEFAULT_MODEL_STANDARD = "gpt-5.3-codex";
 var DEFAULT_MODEL_ADVERSARIAL = "gpt-5.4";
-var DEFAULT_EFFORT_STANDARD = "medium";
-var DEFAULT_EFFORT_ADVERSARIAL = "high";
+var DEFAULT_EFFORT_STANDARD = "xhigh";
+var DEFAULT_EFFORT_ADVERSARIAL = "xhigh";
 function progressFactory2() {
   return (message) => {
     const time = (/* @__PURE__ */ new Date()).toLocaleTimeString("en-US", { hour12: false });

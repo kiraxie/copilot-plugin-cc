@@ -40,6 +40,7 @@ export interface ImplementOptions {
 }
 
 const DEFAULT_MODEL = 'claude-opus-4.6';
+const DEFAULT_EFFORT: ReasoningEffort = 'medium';
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000;
 
 function progressFactory(): (message: string) => void {
@@ -109,6 +110,7 @@ export async function runImplement(task: string, cwd: string, options: Implement
   const stateDir = resolveStateDir(cwd);
   const jobId = options.jobId ?? generateJobId();
   const model = options.model ?? DEFAULT_MODEL;
+  const reasoning = options.reasoning ?? DEFAULT_EFFORT;
   const timeout = options.timeout ?? DEFAULT_TIMEOUT_MS;
   const useWorktree = options.worktree !== false;
   const minQuota = options.minQuota ?? 1;
@@ -227,7 +229,7 @@ export async function runImplement(task: string, cwd: string, options: Implement
   const session = await client.createSession({
     clientName: `${CLIENT_NAME}/${PLUGIN_VERSION}`,
     model,
-    reasoningEffort: options.reasoning,
+    reasoningEffort: reasoning,
     workingDirectory: sessionCwd,
     infiniteSessions: { enabled: false },
     onPermissionRequest: permissionHandler,

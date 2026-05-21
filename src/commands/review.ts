@@ -34,8 +34,8 @@ export interface ReviewOptions {
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000;
 const DEFAULT_MODEL_STANDARD = 'gpt-5.3-codex';
 const DEFAULT_MODEL_ADVERSARIAL = 'gpt-5.4';
-const DEFAULT_EFFORT_STANDARD: ReasoningEffort = 'medium';
-const DEFAULT_EFFORT_ADVERSARIAL: ReasoningEffort = 'high';
+const DEFAULT_EFFORT_STANDARD: ReasoningEffort = 'xhigh';
+const DEFAULT_EFFORT_ADVERSARIAL: ReasoningEffort = 'xhigh';
 
 function progressFactory(): (message: string) => void {
   return (message: string) => {
