@@ -49,13 +49,14 @@ node "${CLAUDE_PLUGIN_ROOT}/dist/copilot-companion.cjs" review $ARGUMENTS
 - Do not fix any issues mentioned in the review output.
 
 Background flow:
-- Launch the review with `Bash` in the background:
+- Launch the review with `Bash` using the harness's own background mode. Do NOT pass `--background` to the node process — run it foreground so the bash call completes when (and only when) the review is actually done. The harness will then auto-notify this session.
 ```typescript
 Bash({
-  command: `node "${CLAUDE_PLUGIN_ROOT}/dist/copilot-companion.cjs" review --background $ARGUMENTS`,
+  command: `node "${CLAUDE_PLUGIN_ROOT}/dist/copilot-companion.cjs" review $ARGUMENTS`,
   description: "Copilot review",
   run_in_background: true
 })
 ```
-- Do not wait for completion in this turn.
-- After launching, tell the user: "Copilot review queued. Check `/copilot:status` for progress and `/copilot:result <jobId>` for the output."
+- Strip `--background` from `$ARGUMENTS` if the user passed it explicitly — harness background supersedes it.
+- Do not wait for completion in this turn. Tell the user: "Copilot review running in the background. You'll be notified when it finishes; the output will be returned verbatim."
+- When the harness notifies completion, read the captured stdout and return it verbatim, exactly as the foreground flow would.

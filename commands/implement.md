@@ -15,8 +15,12 @@ Supports:
 - `--allow-shell` — permit Copilot to run shell commands inside the worktree (needed for tests/builds)
 - `--allow-url` — permit Copilot to fetch URLs
 - `--timeout <ms>` — hard timeout for the session (default 30 min)
-- `--background` — enqueue as a background job; returns a job id
+- `--background` — enqueue as a persistent background job (returns immediately with a job id; survives session end, but does NOT auto-notify the main session — the user must run `/copilot:status` manually). Prefer harness background (see below) unless persistence across sessions is required.
 - `--write <path>` — also write the final report to a file
+
+## Wanting auto-notification while doing other work
+
+If the user wants this session to keep working in parallel and be notified when Copilot finishes, do NOT pass `--background`. Instead, run the foreground command via `Bash({ run_in_background: true })` — the bash call only completes when the implement run actually finishes, and the harness then auto-notifies this session. This is the recommended pattern for "fire and forget but tell me when done."
 
 The stdout is a single-line JSON envelope. Parse it and give the user a short human summary (2–4 lines) — do NOT paste the raw JSON, it is noisy and the host already shows it collapsed.
 

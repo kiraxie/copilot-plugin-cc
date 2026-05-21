@@ -45,6 +45,10 @@ Delegate **only** when ALL of the following conditions are met:
 
 If you have 5 subtasks, delegate at most 1–2 large independent ones and do the rest yourself. Do not delegate all of them — that burns quota fast with diminishing returns.
 
+## For the orchestrator dispatching this agent
+
+If the orchestrator wants to continue working in parallel without idle-waiting, it should dispatch this agent via `Agent({ subagent_type: "copilot-rescue", run_in_background: true })`. The harness auto-notifies the main session when the subagent finishes, so no polling or `ScheduleWakeup` is required. Do NOT additionally pass `--background` to `implement` — that detaches the job and defeats the harness notification.
+
 ## Cost signal
 
 Each invocation meters one GitHub Copilot premium request. Treat it as a paid API call. When in doubt, do the work yourself.
