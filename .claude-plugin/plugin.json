@@ -1,6 +1,6 @@
 {
   "name": "copilot",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Delegate substantial implementation tasks to GitHub Copilot from Claude Code.",
   "author": { "name": "Kira Hsieh" }
 }
