@@ -6,15 +6,8 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __esm = (fn, res) => function __init() {
-  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
-};
 var __commonJS = (cb, mod) => function __require() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
-};
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
 };
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
@@ -3289,142 +3282,6 @@ var require_node = __commonJS({
   }
 });
 
-// src/lib/state.ts
-var state_exports = {};
-__export(state_exports, {
-  appendLog: () => appendLog,
-  createJob: () => createJob,
-  generateJobId: () => generateJobId,
-  getSessionId: () => getSessionId,
-  jobLogPath: () => jobLogPath,
-  listJobs: () => listJobs,
-  readJobFile: () => readJobFile,
-  readLogTail: () => readLogTail,
-  resolveStateDir: () => resolveStateDir,
-  updateJob: () => updateJob,
-  writeJobFile: () => writeJobFile
-});
-function resolveStateDir(cwd) {
-  const workspaceRoot = (0, import_node_path4.resolve)(cwd);
-  const slug = (0, import_node_path4.basename)(workspaceRoot).replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "workspace";
-  const hash = (0, import_node_crypto2.createHash)("sha256").update(workspaceRoot).digest("hex").slice(0, 16);
-  const pluginDataDir = process.env[PLUGIN_DATA_ENV];
-  const stateRoot = pluginDataDir ? (0, import_node_path4.join)(pluginDataDir, "state") : FALLBACK_STATE_ROOT;
-  return (0, import_node_path4.join)(stateRoot, `${slug}-${hash}`);
-}
-function ensureDir(dir) {
-  (0, import_node_fs4.mkdirSync)(dir, { recursive: true });
-}
-function stateFilePath(stateDir) {
-  return (0, import_node_path4.join)(stateDir, "state.json");
-}
-function loadState(stateDir) {
-  const filePath = stateFilePath(stateDir);
-  if (!(0, import_node_fs4.existsSync)(filePath)) {
-    return { version: 1, jobs: [] };
-  }
-  try {
-    return JSON.parse((0, import_node_fs4.readFileSync)(filePath, "utf-8"));
-  } catch {
-    return { version: 1, jobs: [] };
-  }
-}
-function saveState(stateDir, state) {
-  ensureDir(stateDir);
-  if (state.jobs.length > MAX_JOBS) {
-    state.jobs = state.jobs.slice(0, MAX_JOBS);
-  }
-  (0, import_node_fs4.writeFileSync)(stateFilePath(stateDir), JSON.stringify(state, null, 2), "utf-8");
-}
-function jobsDir(stateDir) {
-  return (0, import_node_path4.join)(stateDir, "jobs");
-}
-function jobFilePath(stateDir, jobId) {
-  return (0, import_node_path4.join)(jobsDir(stateDir), `${jobId}.json`);
-}
-function jobLogPath(stateDir, jobId) {
-  return (0, import_node_path4.join)(jobsDir(stateDir), `${jobId}.log`);
-}
-function writeJobFile(stateDir, job) {
-  const dir = jobsDir(stateDir);
-  ensureDir(dir);
-  (0, import_node_fs4.writeFileSync)(jobFilePath(stateDir, job.id), JSON.stringify(job, null, 2), "utf-8");
-}
-function readJobFile(stateDir, jobId) {
-  const filePath = jobFilePath(stateDir, jobId);
-  if (!(0, import_node_fs4.existsSync)(filePath)) return null;
-  try {
-    return JSON.parse((0, import_node_fs4.readFileSync)(filePath, "utf-8"));
-  } catch {
-    return null;
-  }
-}
-function appendLog(stateDir, jobId, message) {
-  const logFile = jobLogPath(stateDir, jobId);
-  ensureDir(jobsDir(stateDir));
-  const time = (/* @__PURE__ */ new Date()).toLocaleTimeString("en-US", { hour12: false });
-  (0, import_node_fs4.writeFileSync)(logFile, `[${time}] ${message}
-`, { flag: "a" });
-}
-function readLogTail(stateDir, jobId, maxLines = 10) {
-  const logFile = jobLogPath(stateDir, jobId);
-  if (!(0, import_node_fs4.existsSync)(logFile)) return [];
-  try {
-    const content = (0, import_node_fs4.readFileSync)(logFile, "utf-8");
-    const lines = content.trim().split("\n");
-    return lines.slice(-maxLines);
-  } catch {
-    return [];
-  }
-}
-function generateJobId() {
-  const ts = Date.now();
-  const rand = (0, import_node_crypto2.randomUUID)().slice(0, 8);
-  return `job-${ts}-${rand}`;
-}
-function getSessionId() {
-  return process.env[SESSION_ID_ENV] || void 0;
-}
-function createJob(stateDir, job) {
-  const state = loadState(stateDir);
-  state.jobs.unshift(job);
-  saveState(stateDir, state);
-  writeJobFile(stateDir, job);
-}
-function updateJob(stateDir, jobId, updates) {
-  const state = loadState(stateDir);
-  const idx = state.jobs.findIndex((j) => j.id === jobId);
-  if (idx >= 0) {
-    state.jobs[idx] = { ...state.jobs[idx], ...updates };
-    saveState(stateDir, state);
-  }
-  const full = readJobFile(stateDir, jobId);
-  if (full) {
-    writeJobFile(stateDir, { ...full, ...updates });
-  }
-}
-function listJobs(stateDir, sessionId) {
-  const state = loadState(stateDir);
-  if (sessionId) {
-    return state.jobs.filter((j) => j.sessionId === sessionId);
-  }
-  return state.jobs;
-}
-var import_node_crypto2, import_node_fs4, import_node_path4, import_node_os, MAX_JOBS, PLUGIN_DATA_ENV, SESSION_ID_ENV, FALLBACK_STATE_ROOT;
-var init_state = __esm({
-  "src/lib/state.ts"() {
-    "use strict";
-    import_node_crypto2 = require("node:crypto");
-    import_node_fs4 = require("node:fs");
-    import_node_path4 = require("node:path");
-    import_node_os = require("node:os");
-    MAX_JOBS = 50;
-    PLUGIN_DATA_ENV = "CLAUDE_PLUGIN_DATA";
-    SESSION_ID_ENV = "COPILOT_COMPANION_SESSION_ID";
-    FALLBACK_STATE_ROOT = (0, import_node_path4.join)((0, import_node_os.tmpdir)(), "copilot-companion");
-  }
-});
-
 // src/copilot-companion.ts
 var import_node_process = __toESM(require("node:process"), 1);
 
@@ -6189,8 +6046,121 @@ function pruneOrphans(cwd, maxAgeDays = 7) {
   return { worktreesPruned, branchesRemoved };
 }
 
-// src/commands/setup.ts
-init_state();
+// src/lib/state.ts
+var import_node_crypto2 = require("node:crypto");
+var import_node_fs4 = require("node:fs");
+var import_node_path4 = require("node:path");
+var import_node_os = require("node:os");
+var MAX_JOBS = 50;
+var PLUGIN_DATA_ENV = "CLAUDE_PLUGIN_DATA";
+var SESSION_ID_ENV = "COPILOT_COMPANION_SESSION_ID";
+var FALLBACK_STATE_ROOT = (0, import_node_path4.join)((0, import_node_os.tmpdir)(), "copilot-companion");
+function resolveStateDir(cwd) {
+  const workspaceRoot = (0, import_node_path4.resolve)(cwd);
+  const slug = (0, import_node_path4.basename)(workspaceRoot).replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "workspace";
+  const hash = (0, import_node_crypto2.createHash)("sha256").update(workspaceRoot).digest("hex").slice(0, 16);
+  const pluginDataDir = process.env[PLUGIN_DATA_ENV];
+  const stateRoot = pluginDataDir ? (0, import_node_path4.join)(pluginDataDir, "state") : FALLBACK_STATE_ROOT;
+  return (0, import_node_path4.join)(stateRoot, `${slug}-${hash}`);
+}
+function ensureDir(dir) {
+  (0, import_node_fs4.mkdirSync)(dir, { recursive: true });
+}
+function stateFilePath(stateDir) {
+  return (0, import_node_path4.join)(stateDir, "state.json");
+}
+function loadState(stateDir) {
+  const filePath = stateFilePath(stateDir);
+  if (!(0, import_node_fs4.existsSync)(filePath)) {
+    return { version: 1, jobs: [] };
+  }
+  try {
+    return JSON.parse((0, import_node_fs4.readFileSync)(filePath, "utf-8"));
+  } catch {
+    return { version: 1, jobs: [] };
+  }
+}
+function saveState(stateDir, state) {
+  ensureDir(stateDir);
+  if (state.jobs.length > MAX_JOBS) {
+    state.jobs = state.jobs.slice(0, MAX_JOBS);
+  }
+  (0, import_node_fs4.writeFileSync)(stateFilePath(stateDir), JSON.stringify(state, null, 2), "utf-8");
+}
+function jobsDir(stateDir) {
+  return (0, import_node_path4.join)(stateDir, "jobs");
+}
+function jobFilePath(stateDir, jobId) {
+  return (0, import_node_path4.join)(jobsDir(stateDir), `${jobId}.json`);
+}
+function jobLogPath(stateDir, jobId) {
+  return (0, import_node_path4.join)(jobsDir(stateDir), `${jobId}.log`);
+}
+function writeJobFile(stateDir, job) {
+  const dir = jobsDir(stateDir);
+  ensureDir(dir);
+  (0, import_node_fs4.writeFileSync)(jobFilePath(stateDir, job.id), JSON.stringify(job, null, 2), "utf-8");
+}
+function readJobFile(stateDir, jobId) {
+  const filePath = jobFilePath(stateDir, jobId);
+  if (!(0, import_node_fs4.existsSync)(filePath)) return null;
+  try {
+    return JSON.parse((0, import_node_fs4.readFileSync)(filePath, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+function appendLog(stateDir, jobId, message) {
+  const logFile = jobLogPath(stateDir, jobId);
+  ensureDir(jobsDir(stateDir));
+  const time = (/* @__PURE__ */ new Date()).toLocaleTimeString("en-US", { hour12: false });
+  (0, import_node_fs4.writeFileSync)(logFile, `[${time}] ${message}
+`, { flag: "a" });
+}
+function readLogTail(stateDir, jobId, maxLines = 10) {
+  const logFile = jobLogPath(stateDir, jobId);
+  if (!(0, import_node_fs4.existsSync)(logFile)) return [];
+  try {
+    const content = (0, import_node_fs4.readFileSync)(logFile, "utf-8");
+    const lines = content.trim().split("\n");
+    return lines.slice(-maxLines);
+  } catch {
+    return [];
+  }
+}
+function generateJobId() {
+  const ts = Date.now();
+  const rand = (0, import_node_crypto2.randomUUID)().slice(0, 8);
+  return `job-${ts}-${rand}`;
+}
+function getSessionId() {
+  return process.env[SESSION_ID_ENV] || void 0;
+}
+function createJob(stateDir, job) {
+  const state = loadState(stateDir);
+  state.jobs.unshift(job);
+  saveState(stateDir, state);
+  writeJobFile(stateDir, job);
+}
+function updateJob(stateDir, jobId, updates) {
+  const state = loadState(stateDir);
+  const idx = state.jobs.findIndex((j) => j.id === jobId);
+  if (idx >= 0) {
+    state.jobs[idx] = { ...state.jobs[idx], ...updates };
+    saveState(stateDir, state);
+  }
+  const full = readJobFile(stateDir, jobId);
+  if (full) {
+    writeJobFile(stateDir, { ...full, ...updates });
+  }
+}
+function listJobs(stateDir, sessionId) {
+  const state = loadState(stateDir);
+  if (sessionId) {
+    return state.jobs.filter((j) => j.sessionId === sessionId);
+  }
+  return state.jobs;
+}
 
 // src/lib/version.ts
 var PLUGIN_VERSION = "0.1.0";
@@ -6316,7 +6286,6 @@ function emit(options, report) {
 // src/commands/implement.ts
 var import_node_fs6 = require("node:fs");
 var import_node_path6 = require("node:path");
-init_state();
 
 // src/lib/permission.ts
 var import_node_fs5 = require("node:fs");
@@ -6633,7 +6602,10 @@ function emit2(env) {
 async function runImplement(task, cwd, options = {}) {
   const progress = progressFactory();
   if (!task.trim()) {
-    emit2({ status: "failed", jobId: options.jobId ?? "unassigned", error: "Empty task; provide an implementation objective." });
+    if (options.jobId) {
+      throw new Error("Empty task; provide an implementation objective.");
+    }
+    emit2({ status: "failed", jobId: "unassigned", error: "Empty task; provide an implementation objective." });
     process.exit(1);
   }
   const stateDir = resolveStateDir(cwd);
@@ -6850,9 +6822,6 @@ async function runImplement(task, cwd, options = {}) {
   log(`implement done: branch=${envelope.branch ?? "none"} files=${envelope.filesModified.length} premium=${envelope.premiumRequests}`);
   progress(`Job log: ${jobLogPath(stateDir, jobId)}`);
 }
-
-// src/commands/review.ts
-init_state();
 
 // src/lib/git.ts
 var import_node_child_process3 = require("node:child_process");
@@ -7494,10 +7463,60 @@ ${reviewBody}
   progress(`Job log: ${jobLogPath(stateDir, jobId)}`);
 }
 
+// src/lib/zombie.ts
+var import_node_fs8 = require("node:fs");
+var STALE_LOG_MS = 6e4;
+function isProcessAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+function logMtimeMs(path) {
+  try {
+    if (!(0, import_node_fs8.existsSync)(path)) return null;
+    return (0, import_node_fs8.statSync)(path).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+function isZombie(job, logFile, now = Date.now()) {
+  if (job.status !== "running" && job.status !== "queued") return false;
+  if (job.pid != null && isProcessAlive(job.pid)) return false;
+  const mtime = logMtimeMs(logFile);
+  if (mtime == null) {
+    const refIso = job.startedAt ?? job.createdAt;
+    const ref = Date.parse(refIso);
+    if (!Number.isFinite(ref)) return false;
+    return now - ref > STALE_LOG_MS;
+  }
+  return now - mtime > STALE_LOG_MS;
+}
+function sweepZombieJobs(stateDir) {
+  const reaped = [];
+  const now = Date.now();
+  const jobs = listJobs(stateDir);
+  for (const job of jobs) {
+    const logFile = jobLogPath(stateDir, job.id);
+    if (!isZombie(job, logFile, now)) continue;
+    updateJob(stateDir, job.id, {
+      status: "failed",
+      phase: "failed",
+      completedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      errorMessage: job.errorMessage ?? "worker process died without writing exit status"
+    });
+    appendLog(stateDir, job.id, "Zombie sweeper: marked failed (pid dead + log stale).");
+    reaped.push(job.id);
+  }
+  return reaped;
+}
+
 // src/commands/status.ts
-init_state();
 async function runStatus(cwd, options = {}) {
   const stateDir = resolveStateDir(cwd);
+  sweepZombieJobs(stateDir);
   const sessionId = options.all ? void 0 : getSessionId();
   if (options.jobId) {
     const job = readJobFile(stateDir, options.jobId);
@@ -7596,9 +7615,9 @@ function renderJobDetail(job, logTail) {
 }
 
 // src/commands/result.ts
-init_state();
 async function runResult(cwd, options = {}) {
   const stateDir = resolveStateDir(cwd);
+  sweepZombieJobs(stateDir);
   let jobId = options.jobId;
   if (!jobId) {
     const sessionId = getSessionId();
@@ -7644,14 +7663,19 @@ async function runResult(cwd, options = {}) {
 
 // src/commands/background.ts
 var import_node_child_process4 = require("node:child_process");
-init_state();
+function extractTask(args, flags) {
+  const positional = args.join(" ").trim();
+  if (positional) return positional;
+  const flag = flags["task"];
+  return typeof flag === "string" ? flag.trim() : "";
+}
 function enqueueBackground(command, args, flags, cwd) {
   if (command !== "implement" && command !== "review") {
     throw new Error(`Background execution is only supported for 'implement' or 'review', got '${command}'.`);
   }
   const stateDir = resolveStateDir(cwd);
   const jobId = generateJobId();
-  const summary = args.join(" ").slice(0, 80) || command;
+  const summary = extractTask(args, flags).slice(0, 80) || command;
   const job = {
     id: jobId,
     kind: command,
@@ -7695,8 +7719,7 @@ function flagNumber(flags, key) {
 }
 async function runWorker(jobId, cwd) {
   const stateDir = resolveStateDir(cwd);
-  const { readJobFile: readJobFile2 } = await Promise.resolve().then(() => (init_state(), state_exports));
-  const job = readJobFile2(stateDir, jobId);
+  const job = readJobFile(stateDir, jobId);
   if (!job) {
     console.error(`Worker: Job not found: ${jobId}`);
     process.exit(1);
@@ -7708,6 +7731,21 @@ async function runWorker(jobId, cwd) {
     startedAt: (/* @__PURE__ */ new Date()).toISOString()
   });
   appendLog(stateDir, jobId, "Worker started.");
+  process.on("exit", (code) => {
+    if (code === 0) return;
+    try {
+      const current = readJobFile(stateDir, jobId);
+      if (!current || current.status === "completed" || current.status === "failed") return;
+      updateJob(stateDir, jobId, {
+        status: "failed",
+        phase: "failed",
+        completedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        errorMessage: current.errorMessage ?? `worker exited with code ${code}`
+      });
+      appendLog(stateDir, jobId, `Worker exit handler: marked failed (code=${code}).`);
+    } catch {
+    }
+  });
   const stdoutChunks = [];
   const originalStdoutWrite = process.stdout.write.bind(process.stdout);
   process.stdout.write = ((chunk, ...rest) => {
@@ -7732,7 +7770,7 @@ async function runWorker(jobId, cwd) {
         adversarial: flags["adversarial"] === true,
         scope: scope && validScopes.includes(scope) ? scope : void 0,
         base: flagString(flags, "base"),
-        focusText: args.join(" "),
+        focusText: extractTask(args, flags),
         model: flagString(flags, "model"),
         reasoning: effort,
         timeout: flagNumber(flags, "timeout"),
@@ -7752,7 +7790,7 @@ async function runWorker(jobId, cwd) {
         writePath: flagString(flags, "write"),
         jobId
       };
-      const task = args.join(" ");
+      const task = extractTask(args, flags);
       await runImplement(task, cwd, implementOpts);
     }
     const captured = stdoutChunks.join("").trim();

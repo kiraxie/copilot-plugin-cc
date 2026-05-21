@@ -10,6 +10,7 @@ import {
   type JobRecord,
 } from '../lib/state.js';
 import { readSnapshot, summarize, renderQuotaBar } from '../lib/quota.js';
+import { sweepZombieJobs } from '../lib/zombie.js';
 
 export interface StatusOptions {
   jobId?: string;
@@ -19,6 +20,7 @@ export interface StatusOptions {
 
 export async function runStatus(cwd: string, options: StatusOptions = {}): Promise<void> {
   const stateDir = resolveStateDir(cwd);
+  sweepZombieJobs(stateDir);
   const sessionId = options.all ? undefined : getSessionId();
 
   if (options.jobId) {

@@ -5,6 +5,7 @@
 import {
   resolveStateDir, listJobs, readJobFile, getSessionId,
 } from '../lib/state.js';
+import { sweepZombieJobs } from '../lib/zombie.js';
 
 export interface ResultOptions {
   jobId?: string;
@@ -13,6 +14,7 @@ export interface ResultOptions {
 
 export async function runResult(cwd: string, options: ResultOptions = {}): Promise<void> {
   const stateDir = resolveStateDir(cwd);
+  sweepZombieJobs(stateDir);
 
   let jobId = options.jobId;
 

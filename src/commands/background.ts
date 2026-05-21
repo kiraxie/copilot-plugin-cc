@@ -12,12 +12,26 @@
 import { spawn } from 'node:child_process';
 import {
   resolveStateDir, generateJobId, createJob, updateJob,
-  appendLog, getSessionId,
+  appendLog, getSessionId, readJobFile,
   type JobRecord,
 } from '../lib/state.js';
 import { runImplement, type ImplementOptions } from './implement.js';
 import { runReview, type ReviewOptions } from './review.js';
 import type { ReviewScope } from '../lib/git.js';
+
+/**
+ * Resolve the task / focus string from positional args with a `--task` flag
+ * fallback. Mirrors the foreground dispatcher's behavior so background and
+ * foreground invocations behave symmetrically; previously the worker only
+ * looked at positional args and silently dropped `--task '<…>'` invocations
+ * to an empty string.
+ */
+function extractTask(args: string[], flags: Record<string, string | boolean>): string {
+  const positional = args.join(' ').trim();
+  if (positional) return positional;
+  const flag = flags['task'];
+  return typeof flag === 'string' ? flag.trim() : '';
+}
 
 declare const __filename: string | undefined;
 
@@ -38,7 +52,7 @@ export function enqueueBackground(
   const stateDir = resolveStateDir(cwd);
   const jobId = generateJobId();
 
-  const summary = args.join(' ').slice(0, 80) || command;
+  const summary = extractTask(args, flags).slice(0, 80) || command;
   const job: JobRecord = {
     id: jobId,
     kind: command,
@@ -96,7 +110,6 @@ function flagNumber(flags: Record<string, string | boolean>, key: string): numbe
  */
 export async function runWorker(jobId: string, cwd: string): Promise<void> {
   const stateDir = resolveStateDir(cwd);
-  const { readJobFile } = await import('../lib/state.js');
   const job = readJobFile(stateDir, jobId);
 
   if (!job) {
@@ -112,6 +125,28 @@ export async function runWorker(jobId: string, cwd: string): Promise<void> {
     startedAt: new Date().toISOString(),
   });
   appendLog(stateDir, jobId, 'Worker started.');
+
+  // Belt-and-suspenders: if anything inside this worker calls process.exit
+  // with a non-zero code before the try/catch below can run (or after the
+  // catch but before its state write), this hook flips the state file to
+  // `failed` so /copilot:status doesn't leave the job stuck at `running`.
+  // Idempotent: only acts when the job is still in queued/running.
+  process.on('exit', (code) => {
+    if (code === 0) return;
+    try {
+      const current = readJobFile(stateDir, jobId);
+      if (!current || current.status === 'completed' || current.status === 'failed') return;
+      updateJob(stateDir, jobId, {
+        status: 'failed',
+        phase: 'failed',
+        completedAt: new Date().toISOString(),
+        errorMessage: current.errorMessage ?? `worker exited with code ${code}`,
+      });
+      appendLog(stateDir, jobId, `Worker exit handler: marked failed (code=${code}).`);
+    } catch {
+      // Best-effort; nothing more we can do from an exit handler.
+    }
+  });
 
   // Route stdout through a buffer so we can persist it to the job record.
   const stdoutChunks: string[] = [];
@@ -146,7 +181,7 @@ export async function runWorker(jobId: string, cwd: string): Promise<void> {
         adversarial: flags['adversarial'] === true,
         scope: scope && (validScopes as string[]).includes(scope) ? (scope as ReviewScope) : undefined,
         base: flagString(flags, 'base'),
-        focusText: args.join(' '),
+        focusText: extractTask(args, flags),
         model: flagString(flags, 'model'),
         reasoning: effort,
         timeout: flagNumber(flags, 'timeout'),
@@ -166,7 +201,7 @@ export async function runWorker(jobId: string, cwd: string): Promise<void> {
         writePath: flagString(flags, 'write'),
         jobId,
       };
-      const task = args.join(' ');
+      const task = extractTask(args, flags);
       await runImplement(task, cwd, implementOpts);
     }
     const captured = stdoutChunks.join('').trim();

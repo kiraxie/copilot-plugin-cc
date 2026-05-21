@@ -103,7 +103,14 @@ export async function runImplement(task: string, cwd: string, options: Implement
   const progress = progressFactory();
 
   if (!task.trim()) {
-    emit({ status: 'failed', jobId: options.jobId ?? 'unassigned', error: 'Empty task; provide an implementation objective.' });
+    // Foreground: emit the JSON envelope and exit so the caller's stdout
+    // parser sees a deterministic failure. Background worker: throw so the
+    // runWorker try/catch persists the failure to state.json instead of
+    // dying mid-process and leaving status stuck at "running".
+    if (options.jobId) {
+      throw new Error('Empty task; provide an implementation objective.');
+    }
+    emit({ status: 'failed', jobId: 'unassigned', error: 'Empty task; provide an implementation objective.' });
     process.exit(1);
   }
 
