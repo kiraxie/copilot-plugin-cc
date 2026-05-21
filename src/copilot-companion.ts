@@ -12,6 +12,7 @@ import { runStatus } from './commands/status.js';
 import { runResult } from './commands/result.js';
 import { enqueueBackground, runWorker } from './commands/background.js';
 import type { ReviewScope } from './lib/git.js';
+import { extractTask } from './lib/args.js';
 
 function printUsage(): void {
   console.log(
@@ -160,7 +161,7 @@ async function main(): Promise<void> {
         console.log(JSON.stringify({ status: 'queued', jobId }));
         break;
       }
-      const task = args.join(' ') || flagString(flags, 'task') || '';
+      const task = extractTask(args, flags);
       await runImplement(task, process.cwd(), {
         model: flagString(flags, 'model'),
         reasoning,

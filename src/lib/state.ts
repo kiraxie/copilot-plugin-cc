@@ -176,6 +176,24 @@ export function updateJob(stateDir: string, jobId: string, updates: Partial<JobR
   }
 }
 
+/**
+ * Mark a job as failed with the given message, also writing a log line.
+ * Idempotent-ish: leaves already-terminal jobs alone so concurrent
+ * failure paths (worker catch, exit handler, zombie sweeper) cannot
+ * clobber an earlier, more specific error message.
+ */
+export function markJobFailed(stateDir: string, jobId: string, errorMessage: string): void {
+  const job = readJobFile(stateDir, jobId);
+  if (!job || job.status === 'completed' || job.status === 'failed') return;
+  updateJob(stateDir, jobId, {
+    status: 'failed',
+    phase: 'failed',
+    completedAt: new Date().toISOString(),
+    errorMessage,
+  });
+  appendLog(stateDir, jobId, `Marked failed: ${errorMessage}`);
+}
+
 export function listJobs(stateDir: string, sessionId?: string): JobRecord[] {
   const state = loadState(stateDir);
   if (sessionId) {

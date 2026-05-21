@@ -11,27 +11,14 @@
 
 import { spawn } from 'node:child_process';
 import {
-  resolveStateDir, generateJobId, createJob, updateJob,
+  resolveStateDir, generateJobId, createJob, updateJob, markJobFailed,
   appendLog, getSessionId, readJobFile,
   type JobRecord,
 } from '../lib/state.js';
 import { runImplement, type ImplementOptions } from './implement.js';
 import { runReview, type ReviewOptions } from './review.js';
 import type { ReviewScope } from '../lib/git.js';
-
-/**
- * Resolve the task / focus string from positional args with a `--task` flag
- * fallback. Mirrors the foreground dispatcher's behavior so background and
- * foreground invocations behave symmetrically; previously the worker only
- * looked at positional args and silently dropped `--task '<…>'` invocations
- * to an empty string.
- */
-function extractTask(args: string[], flags: Record<string, string | boolean>): string {
-  const positional = args.join(' ').trim();
-  if (positional) return positional;
-  const flag = flags['task'];
-  return typeof flag === 'string' ? flag.trim() : '';
-}
+import { extractTask } from '../lib/args.js';
 
 declare const __filename: string | undefined;
 
@@ -126,23 +113,14 @@ export async function runWorker(jobId: string, cwd: string): Promise<void> {
   });
   appendLog(stateDir, jobId, 'Worker started.');
 
-  // Belt-and-suspenders: if anything inside this worker calls process.exit
-  // with a non-zero code before the try/catch below can run (or after the
-  // catch but before its state write), this hook flips the state file to
-  // `failed` so /copilot:status doesn't leave the job stuck at `running`.
-  // Idempotent: only acts when the job is still in queued/running.
+  // If anything inside this worker calls process.exit with a non-zero
+  // code before the try/catch below can persist failure, this hook is
+  // the backstop so /copilot:status doesn't leave the job stuck at
+  // `running`. markJobFailed itself is idempotent on terminal states.
   process.on('exit', (code) => {
     if (code === 0) return;
     try {
-      const current = readJobFile(stateDir, jobId);
-      if (!current || current.status === 'completed' || current.status === 'failed') return;
-      updateJob(stateDir, jobId, {
-        status: 'failed',
-        phase: 'failed',
-        completedAt: new Date().toISOString(),
-        errorMessage: current.errorMessage ?? `worker exited with code ${code}`,
-      });
-      appendLog(stateDir, jobId, `Worker exit handler: marked failed (code=${code}).`);
+      markJobFailed(stateDir, jobId, `worker exited with code ${code}`);
     } catch {
       // Best-effort; nothing more we can do from an exit handler.
     }
@@ -202,6 +180,7 @@ export async function runWorker(jobId: string, cwd: string): Promise<void> {
         jobId,
       };
       const task = extractTask(args, flags);
+      if (!task) throw new Error('Empty task; provide an implementation objective.');
       await runImplement(task, cwd, implementOpts);
     }
     const captured = stdoutChunks.join('').trim();
@@ -214,13 +193,7 @@ export async function runWorker(jobId: string, cwd: string): Promise<void> {
     appendLog(stateDir, jobId, 'Worker completed.');
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    updateJob(stateDir, jobId, {
-      status: 'failed',
-      phase: 'failed',
-      completedAt: new Date().toISOString(),
-      errorMessage: message,
-    });
-    appendLog(stateDir, jobId, `Worker failed: ${message}`);
+    markJobFailed(stateDir, jobId, message);
   } finally {
     process.stdout.write = originalStdoutWrite;
     process.stderr.write = originalStderrWrite;

@@ -6154,6 +6154,17 @@ function updateJob(stateDir, jobId, updates) {
     writeJobFile(stateDir, { ...full, ...updates });
   }
 }
+function markJobFailed(stateDir, jobId, errorMessage) {
+  const job = readJobFile(stateDir, jobId);
+  if (!job || job.status === "completed" || job.status === "failed") return;
+  updateJob(stateDir, jobId, {
+    status: "failed",
+    phase: "failed",
+    completedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    errorMessage
+  });
+  appendLog(stateDir, jobId, `Marked failed: ${errorMessage}`);
+}
 function listJobs(stateDir, sessionId) {
   const state = loadState(stateDir);
   if (sessionId) {
@@ -6602,10 +6613,7 @@ function emit2(env) {
 async function runImplement(task, cwd, options = {}) {
   const progress = progressFactory();
   if (!task.trim()) {
-    if (options.jobId) {
-      throw new Error("Empty task; provide an implementation objective.");
-    }
-    emit2({ status: "failed", jobId: "unassigned", error: "Empty task; provide an implementation objective." });
+    emit2({ status: "failed", jobId: options.jobId ?? "unassigned", error: "Empty task; provide an implementation objective." });
     process.exit(1);
   }
   const stateDir = resolveStateDir(cwd);
@@ -7497,17 +7505,10 @@ function isZombie(job, logFile, now = Date.now()) {
 function sweepZombieJobs(stateDir) {
   const reaped = [];
   const now = Date.now();
-  const jobs = listJobs(stateDir);
-  for (const job of jobs) {
+  for (const job of listJobs(stateDir)) {
     const logFile = jobLogPath(stateDir, job.id);
     if (!isZombie(job, logFile, now)) continue;
-    updateJob(stateDir, job.id, {
-      status: "failed",
-      phase: "failed",
-      completedAt: (/* @__PURE__ */ new Date()).toISOString(),
-      errorMessage: job.errorMessage ?? "worker process died without writing exit status"
-    });
-    appendLog(stateDir, job.id, "Zombie sweeper: marked failed (pid dead + log stale).");
+    markJobFailed(stateDir, job.id, "worker process died without writing exit status");
     reaped.push(job.id);
   }
   return reaped;
@@ -7663,12 +7664,16 @@ async function runResult(cwd, options = {}) {
 
 // src/commands/background.ts
 var import_node_child_process4 = require("node:child_process");
+
+// src/lib/args.ts
 function extractTask(args, flags) {
   const positional = args.join(" ").trim();
   if (positional) return positional;
   const flag = flags["task"];
   return typeof flag === "string" ? flag.trim() : "";
 }
+
+// src/commands/background.ts
 function enqueueBackground(command, args, flags, cwd) {
   if (command !== "implement" && command !== "review") {
     throw new Error(`Background execution is only supported for 'implement' or 'review', got '${command}'.`);
@@ -7734,15 +7739,7 @@ async function runWorker(jobId, cwd) {
   process.on("exit", (code) => {
     if (code === 0) return;
     try {
-      const current = readJobFile(stateDir, jobId);
-      if (!current || current.status === "completed" || current.status === "failed") return;
-      updateJob(stateDir, jobId, {
-        status: "failed",
-        phase: "failed",
-        completedAt: (/* @__PURE__ */ new Date()).toISOString(),
-        errorMessage: current.errorMessage ?? `worker exited with code ${code}`
-      });
-      appendLog(stateDir, jobId, `Worker exit handler: marked failed (code=${code}).`);
+      markJobFailed(stateDir, jobId, `worker exited with code ${code}`);
     } catch {
     }
   });
@@ -7791,6 +7788,7 @@ async function runWorker(jobId, cwd) {
         jobId
       };
       const task = extractTask(args, flags);
+      if (!task) throw new Error("Empty task; provide an implementation objective.");
       await runImplement(task, cwd, implementOpts);
     }
     const captured = stdoutChunks.join("").trim();
@@ -7803,13 +7801,7 @@ async function runWorker(jobId, cwd) {
     appendLog(stateDir, jobId, "Worker completed.");
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    updateJob(stateDir, jobId, {
-      status: "failed",
-      phase: "failed",
-      completedAt: (/* @__PURE__ */ new Date()).toISOString(),
-      errorMessage: message
-    });
-    appendLog(stateDir, jobId, `Worker failed: ${message}`);
+    markJobFailed(stateDir, jobId, message);
   } finally {
     process.stdout.write = originalStdoutWrite;
     process.stderr.write = originalStderrWrite;
@@ -7934,7 +7926,7 @@ async function main() {
         console.log(JSON.stringify({ status: "queued", jobId }));
         break;
       }
-      const task = args.join(" ") || flagString2(flags, "task") || "";
+      const task = extractTask(args, flags);
       await runImplement(task, import_node_process.default.cwd(), {
         model: flagString2(flags, "model"),
         reasoning,
