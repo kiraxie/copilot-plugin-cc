@@ -8,6 +8,7 @@ import process from 'node:process';
 import { runSetup } from './commands/setup.js';
 import { runImplement } from './commands/implement.js';
 import { runReview } from './commands/review.js';
+import { runFix } from './commands/fix.js';
 import { runStatus } from './commands/status.js';
 import { runResult } from './commands/result.js';
 import { enqueueBackground, runWorker } from './commands/background.js';
@@ -24,16 +25,20 @@ function printUsage(): void {
       '                               [--timeout <ms>] [--min-quota <n>]',
       '                               [--background] [--write <path>]',
       '  copilot-companion review [focus...] [--adversarial] [--base <ref>]',
-      '                           [--scope auto|working-tree|branch]',
+      '                           [--scope auto|working-tree|branch] [--fix]',
       '                           [--model <id>] [--reasoning <low|medium|high|xhigh>]',
       '                           [--timeout <ms>] [--min-quota <n>] [--background]',
+      '  copilot-companion fix --findings <path> [--model <id>]',
+      '                        [--reasoning <low|medium|high|xhigh>]',
+      '                        [--timeout <ms>] [--min-quota <n>] [--write <path>]',
       '  copilot-companion status [job-id] [--all] [--json]',
       '  copilot-companion result [job-id] [--json]',
       '',
       'Commands:',
       '  setup       Check GitHub Copilot authentication, available models, quota',
       '  implement   Delegate an implementation task to GitHub Copilot',
-      '  review      Run a Copilot code review (markdown output)',
+      '  review      Run a Copilot code review (markdown, or JSON findings with --fix)',
+      '  fix         Apply Claude-Code-approved review findings to the working tree',
       '  status      Show quota plus background job status',
       '  result      Retrieve a background job\'s output',
     ].join('\n'),
@@ -56,6 +61,7 @@ const BOOLEAN_FLAGS = new Set<string>([
   'allow-url',
   'background',
   'check',
+  'fix',
   'help',
   'json',
   'no-worktree',
@@ -197,6 +203,22 @@ async function main(): Promise<void> {
         reasoning,
         timeout: flagNumber(flags, 'timeout'),
         minQuota: flagNumber(flags, 'min-quota'),
+        fix: flags['fix'] === true,
+      });
+      break;
+    }
+
+    case 'fix': {
+      const reasoning = flagEnum(flags, 'reasoning', ['low', 'medium', 'high', 'xhigh'] as const);
+      await runFix(process.cwd(), {
+        findingsPath: flagString(flags, 'findings'),
+        model: flagString(flags, 'model'),
+        reasoning,
+        timeout: flagNumber(flags, 'timeout'),
+        minQuota: flagNumber(flags, 'min-quota'),
+        allowShell: flags['allow-shell'] === true,
+        allowUrl: flags['allow-url'] === true,
+        writePath: flagString(flags, 'write'),
       });
       break;
     }

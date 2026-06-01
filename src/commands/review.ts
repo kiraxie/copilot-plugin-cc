@@ -16,6 +16,7 @@ import { makePermissionHandler } from '../lib/permission.js';
 import { attachStream } from '../lib/event-stream.js';
 import { resolveReviewTarget, collectReviewContext, type ReviewScope } from '../lib/git.js';
 import { buildReviewPrompt, type ReviewKind } from '../lib/review-prompts.js';
+import { extractJsonBlock, normalizeFindings, FINDINGS_OUTPUT_INSTRUCTION } from '../lib/findings.js';
 import { CLIENT_NAME, PLUGIN_VERSION } from '../lib/version.js';
 import type { ReasoningEffort } from './implement.js';
 
@@ -29,6 +30,12 @@ export interface ReviewOptions {
   timeout?: number;
   minQuota?: number;
   jobId?: string;
+  /**
+   * Structured-findings mode. Instead of markdown, emit a `reviewed` JSON
+   * envelope (findings + metadata) on stdout so Claude Code can judge each
+   * finding and hand the approved subset to the `fix` command.
+   */
+  fix?: boolean;
 }
 
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000;
@@ -86,8 +93,10 @@ export async function runReview(cwd: string, options: ReviewOptions = {}): Promi
   }
 
   // 3. Build prompt ----------------------------------------------------------
-  const prompt = buildReviewPrompt(kind, { context, focusText: options.focusText ?? '' });
-  log(`prompt built: ${prompt.length} chars`);
+  const fixMode = options.fix === true;
+  let prompt = buildReviewPrompt(kind, { context, focusText: options.focusText ?? '' });
+  if (fixMode) prompt += `\n${FINDINGS_OUTPUT_INSTRUCTION}`;
+  log(`prompt built: ${prompt.length} chars${fixMode ? ' (structured findings mode)' : ''}`);
 
   // 4. Copilot client (read-only) --------------------------------------------
   const client = new CopilotClient({ workingDirectory: context.repoRoot, env: process.env });
@@ -241,9 +250,29 @@ export async function runReview(cwd: string, options: ReviewOptions = {}): Promi
   const premium = premiumRequestCost ?? shutdownResult?.premiumRequestCost ?? 0;
   const usedModel = shutdownResult?.currentModel ?? model;
 
-  // Stdout is Copilot's markdown verbatim — slash-command consumers and
-  // anything piping the output should see exactly what the model produced.
-  process.stdout.write(`${reviewBody.trim()}\n`);
+  if (fixMode) {
+    // Structured mode: emit a single JSON envelope on stdout so Claude Code can
+    // parse the findings, judge each against its conversation context, and pass
+    // the approved subset to `fix`. The markdown stays available for humans.
+    const findings = normalizeFindings(extractJsonBlock(reviewBody));
+    const envelope = {
+      status: 'reviewed' as const,
+      kind,
+      model: usedModel,
+      target: context.target.label,
+      fileCount: context.fileCount,
+      findings,
+      reviewMarkdown: reviewBody.trim(),
+      premiumRequestCost: premium,
+      quotaRemaining,
+    };
+    process.stdout.write(`${JSON.stringify(envelope)}\n`);
+    log(`review (fix mode) done: ${findings.length} structured finding(s)`);
+  } else {
+    // Stdout is Copilot's markdown verbatim — slash-command consumers and
+    // anything piping the output should see exactly what the model produced.
+    process.stdout.write(`${reviewBody.trim()}\n`);
+  }
 
   // Run metadata goes to stderr (same channel as progress) so foreground users
   // still see it, background workers log it, and stdout stays clean. Render

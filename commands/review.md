@@ -1,8 +1,8 @@
 ---
-description: Run a Copilot code review against local git state. Read-only; no file edits. Pass --adversarial for a stricter design-challenge review.
-argument-hint: '[--adversarial] [--wait|--background] [--base <ref>] [--scope auto|working-tree|branch] [--model <id>] [--reasoning low|medium|high|xhigh] [focus...]'
+description: Run a Copilot code review against local git state. Read-only by default; pass --fix to let Claude Code judge findings and hand the approved ones back to Copilot for repair. Pass --adversarial for a stricter design-challenge review.
+argument-hint: '[--adversarial] [--fix] [--wait|--background] [--base <ref>] [--scope auto|working-tree|branch] [--model <id>] [--reasoning low|medium|high|xhigh] [focus...]'
 disable-model-invocation: true
-allowed-tools: Read, Glob, Grep, Bash(node:*), Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git rev-parse:*), Bash(git symbolic-ref:*), Bash(git show-ref:*), Bash(git ls-files:*), Bash(git branch:*), AskUserQuestion
+allowed-tools: Read, Write, Glob, Grep, Bash(node:*), Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git rev-parse:*), Bash(git symbolic-ref:*), Bash(git show-ref:*), Bash(git ls-files:*), Bash(git branch:*), AskUserQuestion
 ---
 
 Run a Copilot review through the plugin runtime.
@@ -10,10 +10,12 @@ Run a Copilot review through the plugin runtime.
 Raw slash-command arguments:
 `$ARGUMENTS`
 
-Core constraint:
+Core constraint (default / non-`--fix` mode):
 - This command is review-only. Copilot is run with file writes, shell, and URL fetches all denied.
 - Do not fix issues, apply patches, or suggest that you are about to make changes.
 - Your only job is to run the review and return Copilot's output verbatim to the user.
+
+**If the raw arguments include `--fix`, the core constraint above does NOT apply — follow the "Fix mode" section below instead of the foreground/background flows.**
 
 Mode selection:
 - Default mode is a focused defect review (`gpt-5.3-codex`, medium effort).
@@ -60,3 +62,29 @@ Bash({
 - Strip `--background` from `$ARGUMENTS` if the user passed it explicitly — harness background supersedes it.
 - Do not wait for completion in this turn. Tell the user: "Copilot review running in the background. You'll be notified when it finishes; the output will be returned verbatim."
 - When the harness notifies completion, read the captured stdout and return it verbatim, exactly as the foreground flow would.
+
+## Fix mode (`--fix`)
+
+Only when `$ARGUMENTS` contains `--fix`. This is a three-stage pipeline where **you (Claude Code) are the judge in the middle** — the reviewer model runs in an isolated session and cannot see this conversation, so it may flag things that are intentional and known only to you.
+
+### Stage 1 — Structured review
+Run the review in structured-findings mode (forward all other args verbatim, including `--adversarial` / `--base` / `--scope` / focus text):
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/dist/copilot-companion.cjs" review $ARGUMENTS
+```
+Stdout is a single JSON line: `{"status":"reviewed", findings:[{id,file,line,severity,title,rationale,suggestedFix}], reviewMarkdown, ...}`. Parse it. If `findings` is empty, tell the user the review found nothing material and stop (do not call `fix`).
+
+### Stage 2 — Judge each finding (your job)
+For every finding, decide whether it is a **real defect** or a **false positive**. A finding is a false positive when the flagged behavior is an intentional choice you have context for from this conversation (a deliberate workaround, a known-safe pattern, a decision the user already made, code intentionally left as-is). Use the conversation history and read the cited files (`Read`) to judge — do not rubber-stamp the reviewer.
+
+Then present a concise table to the user: each finding's id, file:line, title, and your verdict (**Keep** / **Drop**) with a one-line reason for every Drop. Use `AskUserQuestion` to confirm before proceeding — the user may override any verdict. **Do not call `fix` until the user approves.**
+
+### Stage 3 — Apply approved fixes
+Write the approved findings (the kept subset, full objects) to a temp file, then run `fix`:
+```bash
+# Write approved findings JSON to e.g. /tmp/copilot-fix-findings.json via the Write tool, then:
+node "${CLAUDE_PLUGIN_ROOT}/dist/copilot-companion.cjs" fix --findings /tmp/copilot-fix-findings.json
+```
+- `fix` first commits any pre-existing uncommitted changes as a baseline snapshot, then applies the fixes to the working tree (leaving them staged) and emits `{"status":"fixed", filesModified, applied, skipped, ...}`.
+- Report back: which findings were applied, which the model skipped (with reasons), and the files changed. Tell the user the fixes are **staged but not committed** so they can review with `git diff --cached` before committing.
+- If `status` is `blocked` (quota) or `failed`, surface the message and stop.

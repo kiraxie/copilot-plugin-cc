@@ -1027,8 +1027,8 @@ var require_semaphore = __commonJS({
         this._waiting = [];
       }
       lock(thunk) {
-        return new Promise((resolve4, reject) => {
-          this._waiting.push({ thunk, resolve: resolve4, reject });
+        return new Promise((resolve5, reject) => {
+          this._waiting.push({ thunk, resolve: resolve5, reject });
           this.runNext();
         });
       }
@@ -2518,9 +2518,9 @@ ${JSON.stringify(message, null, 4)}`);
           if (typeof cancellationStrategy.sender.enableCancellation === "function") {
             cancellationStrategy.sender.enableCancellation(requestMessage);
           }
-          return new Promise(async (resolve4, reject) => {
+          return new Promise(async (resolve5, reject) => {
             const resolveWithCleanup = (r) => {
-              resolve4(r);
+              resolve5(r);
               cancellationStrategy.sender.cleanup(id);
               disposable?.dispose();
             };
@@ -2932,10 +2932,10 @@ var require_ril = __commonJS({
         return api_1.Disposable.create(() => this.stream.off("end", listener));
       }
       write(data, encoding) {
-        return new Promise((resolve4, reject) => {
+        return new Promise((resolve5, reject) => {
           const callback = (error) => {
             if (error === void 0 || error === null) {
-              resolve4();
+              resolve5();
             } else {
               reject(error);
             }
@@ -3187,10 +3187,10 @@ var require_main = __commonJS({
     exports2.generateRandomPipeName = generateRandomPipeName;
     function createClientPipeTransport(pipeName, encoding = "utf-8") {
       let connectResolve;
-      const connected = new Promise((resolve4, _reject) => {
-        connectResolve = resolve4;
+      const connected = new Promise((resolve5, _reject) => {
+        connectResolve = resolve5;
       });
-      return new Promise((resolve4, reject) => {
+      return new Promise((resolve5, reject) => {
         let server = (0, net_1.createServer)((socket) => {
           server.close();
           connectResolve([
@@ -3201,7 +3201,7 @@ var require_main = __commonJS({
         server.on("error", reject);
         server.listen(pipeName, () => {
           server.removeListener("error", reject);
-          resolve4({
+          resolve5({
             onConnected: () => {
               return connected;
             }
@@ -3220,10 +3220,10 @@ var require_main = __commonJS({
     exports2.createServerPipeTransport = createServerPipeTransport;
     function createClientSocketTransport(port, encoding = "utf-8") {
       let connectResolve;
-      const connected = new Promise((resolve4, _reject) => {
-        connectResolve = resolve4;
+      const connected = new Promise((resolve5, _reject) => {
+        connectResolve = resolve5;
       });
-      return new Promise((resolve4, reject) => {
+      return new Promise((resolve5, reject) => {
         const server = (0, net_1.createServer)((socket) => {
           server.close();
           connectResolve([
@@ -3234,7 +3234,7 @@ var require_main = __commonJS({
         server.on("error", reject);
         server.listen(port, "127.0.0.1", () => {
           server.removeListener("error", reject);
-          resolve4({
+          resolve5({
             onConnected: () => {
               return connected;
             }
@@ -4920,8 +4920,8 @@ var CopilotSession = class {
     const effectiveTimeout = timeout ?? 6e4;
     let resolveIdle;
     let rejectWithError;
-    const idlePromise = new Promise((resolve4, reject) => {
-      resolveIdle = resolve4;
+    const idlePromise = new Promise((resolve5, reject) => {
+      resolveIdle = resolve5;
       rejectWithError = reject;
     });
     let lastAssistantMessage;
@@ -6266,7 +6266,7 @@ var CopilotClient = class _CopilotClient {
           lastError = error instanceof Error ? error : new Error(String(error));
           if (attempt < 3) {
             const delay = 100 * Math.pow(2, attempt - 1);
-            await new Promise((resolve4) => setTimeout(resolve4, delay));
+            await new Promise((resolve5) => setTimeout(resolve5, delay));
           }
         }
       }
@@ -6298,8 +6298,8 @@ var CopilotClient = class _CopilotClient {
       this.socket = null;
       try {
         if (!socket.destroyed) {
-          await new Promise((resolve4) => {
-            socket.once("close", () => resolve4());
+          await new Promise((resolve5) => {
+            socket.once("close", () => resolve5());
             socket.end();
           });
         }
@@ -6316,8 +6316,8 @@ var CopilotClient = class _CopilotClient {
       this.cliProcess = null;
       try {
         if (child.exitCode === null && child.signalCode === null) {
-          const exited = new Promise((resolve4) => {
-            child.once("exit", () => resolve4());
+          const exited = new Promise((resolve5) => {
+            child.once("exit", () => resolve5());
           });
           child.kill();
           await exited;
@@ -6847,8 +6847,8 @@ var CopilotClient = class _CopilotClient {
   async listModels() {
     await this.modelsCacheLock;
     let resolveLock;
-    this.modelsCacheLock = new Promise((resolve4) => {
-      resolveLock = resolve4;
+    this.modelsCacheLock = new Promise((resolve5) => {
+      resolveLock = resolve5;
     });
     try {
       if (this.modelsCache !== null) {
@@ -7125,7 +7125,7 @@ var CopilotClient = class _CopilotClient {
    * Start the CLI server process
    */
   async startCLIServer() {
-    return new Promise((resolve4, reject) => {
+    return new Promise((resolve5, reject) => {
       this.stderrBuffer = "";
       const args = [...this.connectionExtraArgs, "--headless", "--no-auto-update"];
       if (this.options.logLevel) {
@@ -7215,7 +7215,7 @@ var CopilotClient = class _CopilotClient {
       let resolved = false;
       if (this.connectionConfig.kind === "stdio") {
         resolved = true;
-        resolve4();
+        resolve5();
       } else {
         this.cliProcess.stdout?.on("data", (data) => {
           stdout += data.toString();
@@ -7223,7 +7223,7 @@ var CopilotClient = class _CopilotClient {
           if (match && !resolved) {
             this.runtimePort = parseInt(match[1], 10);
             resolved = true;
-            resolve4();
+            resolve5();
           }
         });
       }
@@ -7352,7 +7352,7 @@ stderr: ${stderrOutput}`
     if (!this.runtimePort) {
       throw new Error("Server port not available");
     }
-    return new Promise((resolve4, reject) => {
+    return new Promise((resolve5, reject) => {
       this.socket = new import_node_net.Socket();
       const connectionTimeout = setTimeout(() => {
         this.socket?.destroy();
@@ -7366,7 +7366,7 @@ stderr: ${stderrOutput}`
         );
         this.attachConnectionHandlers();
         this.connection.listen();
-        resolve4();
+        resolve5();
       });
       this.socket.on("error", (error) => {
         clearTimeout(connectionTimeout);
@@ -9154,6 +9154,79 @@ function buildReviewPrompt(kind, vars) {
   });
 }
 
+// src/lib/findings.ts
+var VALID_SEVERITIES = /* @__PURE__ */ new Set(["blocker", "major", "minor"]);
+function extractJsonBlock(text) {
+  const fenceRe = /```(?:json)?\s*\n([\s\S]*?)```/gi;
+  let lastMatch;
+  for (const m of text.matchAll(fenceRe)) {
+    if (m[1]) lastMatch = m[1];
+  }
+  const candidates = lastMatch ? [lastMatch] : [];
+  if (candidates.length === 0) {
+    const start = text.lastIndexOf("[");
+    const end = text.lastIndexOf("]");
+    if (start !== -1 && end > start) candidates.push(text.slice(start, end + 1));
+  }
+  for (const c of candidates) {
+    try {
+      return JSON.parse(c.trim());
+    } catch {
+    }
+  }
+  return null;
+}
+function normalizeFindings(parsed) {
+  const arr = Array.isArray(parsed) ? parsed : parsed && typeof parsed === "object" && Array.isArray(parsed.findings) ? parsed.findings : [];
+  const out = [];
+  let auto = 0;
+  for (const raw of arr) {
+    if (!raw || typeof raw !== "object") continue;
+    const r = raw;
+    const file = typeof r["file"] === "string" ? r["file"] : "";
+    const title = typeof r["title"] === "string" ? r["title"] : "";
+    if (!file || !title) continue;
+    const sev = typeof r["severity"] === "string" && VALID_SEVERITIES.has(r["severity"]) ? r["severity"] : "major";
+    const id = typeof r["id"] === "string" && r["id"].trim() ? r["id"].trim() : `finding-${++auto}`;
+    out.push({
+      id,
+      file,
+      line: typeof r["line"] === "string" ? r["line"] : typeof r["line"] === "number" ? String(r["line"]) : void 0,
+      severity: sev,
+      title,
+      rationale: typeof r["rationale"] === "string" ? r["rationale"] : "",
+      suggestedFix: typeof r["suggestedFix"] === "string" ? r["suggestedFix"] : ""
+    });
+  }
+  return out;
+}
+var FINDINGS_OUTPUT_INSTRUCTION = `
+<structured_findings>
+This review feeds an automated fix pipeline. After your markdown review, output
+ONE fenced code block tagged \`json\` containing an array of the material
+findings (and ONLY material findings \u2014 omit notes, praise, and style nits):
+
+\`\`\`json
+[
+  {
+    "id": "kebab-case-stable-id",
+    "file": "relative/path.ts",
+    "line": "42-50",
+    "severity": "blocker | major | minor",
+    "title": "one-sentence statement of the defect",
+    "rationale": "why this is a real defect",
+    "suggestedFix": "concrete change to make"
+  }
+]
+\`\`\`
+
+Rules:
+- If there are no material findings, output an empty array: \`[]\`.
+- "line" is optional; omit it for file-wide findings.
+- Keep ids stable and descriptive \u2014 they are how a human approves each fix.
+</structured_findings>
+`;
+
 // src/commands/review.ts
 var DEFAULT_TIMEOUT_MS2 = 30 * 60 * 1e3;
 var DEFAULT_MODEL_STANDARD = "gpt-5.3-codex";
@@ -9200,8 +9273,11 @@ No changes to review under ${context.target.label}.
   } else {
     log(`quota gate skipped: model ${model} is not premium-metered`);
   }
-  const prompt = buildReviewPrompt(kind, { context, focusText: options.focusText ?? "" });
-  log(`prompt built: ${prompt.length} chars`);
+  const fixMode = options.fix === true;
+  let prompt = buildReviewPrompt(kind, { context, focusText: options.focusText ?? "" });
+  if (fixMode) prompt += `
+${FINDINGS_OUTPUT_INSTRUCTION}`;
+  log(`prompt built: ${prompt.length} chars${fixMode ? " (structured findings mode)" : ""}`);
   const client = new CopilotClient({ workingDirectory: context.repoRoot, env: process.env });
   let cleanupDone = false;
   let aborted = false;
@@ -9332,8 +9408,26 @@ ${reviewBody}
   const quotaRemaining = summarize(readSnapshot(stateDir));
   const premium = premiumRequestCost ?? shutdownResult?.premiumRequestCost ?? 0;
   const usedModel = shutdownResult?.currentModel ?? model;
-  process.stdout.write(`${reviewBody.trim()}
+  if (fixMode) {
+    const findings = normalizeFindings(extractJsonBlock(reviewBody));
+    const envelope = {
+      status: "reviewed",
+      kind,
+      model: usedModel,
+      target: context.target.label,
+      fileCount: context.fileCount,
+      findings,
+      reviewMarkdown: reviewBody.trim(),
+      premiumRequestCost: premium,
+      quotaRemaining
+    };
+    process.stdout.write(`${JSON.stringify(envelope)}
 `);
+    log(`review (fix mode) done: ${findings.length} structured finding(s)`);
+  } else {
+    process.stdout.write(`${reviewBody.trim()}
+`);
+  }
   const poolNote = quotaRemaining.pools.length > 0 ? quotaRemaining.pools.map(
     (p) => p.unlimited ? `${p.label}=unlimited` : `${p.label}=${fmtNum(p.remaining ?? 0)}/${fmtNum(p.total ?? 0)}`
   ).join(", ") : "no quota snapshot yet";
@@ -9344,8 +9438,299 @@ ${reviewBody}
   progress(`Job log: ${jobLogPath(stateDir, jobId)}`);
 }
 
-// src/lib/zombie.ts
+// src/commands/fix.ts
+var import_node_child_process4 = require("node:child_process");
 var import_node_fs8 = require("node:fs");
+var import_node_path8 = require("node:path");
+var DEFAULT_MODEL3 = "claude-opus-4.8";
+var DEFAULT_EFFORT2 = "high";
+var DEFAULT_TIMEOUT_MS3 = 30 * 60 * 1e3;
+function progressFactory3() {
+  return (message) => {
+    const time = (/* @__PURE__ */ new Date()).toLocaleTimeString("en-US", { hour12: false });
+    process.stderr.write(`[${time}] ${message}
+`);
+  };
+}
+function tryGit2(args, cwd) {
+  const res = (0, import_node_child_process4.spawnSync)("git", args, { cwd, encoding: "utf-8" });
+  return { ok: res.status === 0, stdout: (res.stdout ?? "").trim(), stderr: (res.stderr ?? "").trim() };
+}
+function gitHead(cwd) {
+  try {
+    return (0, import_node_child_process4.execFileSync)("git", ["rev-parse", "HEAD"], { cwd, encoding: "utf-8" }).trim();
+  } catch {
+    return "";
+  }
+}
+function emit3(env) {
+  const json = JSON.stringify(env);
+  process.stdout.write(json + "\n");
+  return json;
+}
+function loadFindings(path) {
+  const raw = (0, import_node_fs8.readFileSync)(path, "utf-8");
+  return normalizeFindings(JSON.parse(raw));
+}
+function buildFixPrompt(findings) {
+  const blocks = findings.map((f, i) => {
+    const loc = f.line ? `${f.file}:${f.line}` : f.file;
+    return [
+      `### Finding ${i + 1} \u2014 id: ${f.id} (${f.severity})`,
+      `Location: ${loc}`,
+      `Issue: ${f.title}`,
+      f.rationale ? `Why: ${f.rationale}` : "",
+      f.suggestedFix ? `Suggested fix: ${f.suggestedFix}` : ""
+    ].filter(Boolean).join("\n");
+  }).join("\n\n");
+  return [
+    "Apply the following code-review fixes to this repository. Each finding has",
+    "already been vetted by a human reviewer \u2014 implement the fix for each one.",
+    "",
+    "Guidelines:",
+    "- Make the minimal, correct change for each finding. Do not refactor unrelated code.",
+    "- If a finding cannot be safely applied (already fixed, no longer applies, or",
+    "  the suggested fix would break something), skip it and explain why.",
+    "- Do not commit; just edit the files.",
+    "",
+    "FINDINGS TO FIX:",
+    "",
+    blocks,
+    "",
+    "When done, output ONE fenced ```json block reporting what you did:",
+    "```json",
+    '{ "applied": ["finding-id", ...], "skipped": [{ "id": "finding-id", "reason": "..." }] }',
+    "```"
+  ].join("\n");
+}
+function parseApplyReport(text, findings) {
+  const parsed = extractJsonBlock(text);
+  const ids = new Set(findings.map((f) => f.id));
+  const applied = [];
+  const skipped = [];
+  if (parsed && typeof parsed === "object") {
+    const p = parsed;
+    if (Array.isArray(p.applied)) {
+      for (const a of p.applied) if (typeof a === "string" && ids.has(a)) applied.push(a);
+    }
+    if (Array.isArray(p.skipped)) {
+      for (const s of p.skipped) {
+        if (s && typeof s === "object") {
+          const id = s.id;
+          const reason = s.reason;
+          if (typeof id === "string") skipped.push({ id, reason: typeof reason === "string" ? reason : "no reason given" });
+        }
+      }
+    }
+  }
+  const accounted = /* @__PURE__ */ new Set([...applied, ...skipped.map((s) => s.id)]);
+  for (const f of findings) {
+    if (!accounted.has(f.id)) skipped.push({ id: f.id, reason: "not reported by the model" });
+  }
+  return { applied, skipped };
+}
+function computeStagedDiff(cwd, baseline) {
+  tryGit2(["add", "-A"], cwd);
+  const names = tryGit2(["diff", "--cached", "--name-only", baseline], cwd);
+  const filesModified = names.ok && names.stdout ? names.stdout.split("\n").filter(Boolean) : [];
+  let linesAdded = 0;
+  let linesRemoved = 0;
+  const numstat = tryGit2(["diff", "--cached", "--numstat", baseline], cwd);
+  if (numstat.ok && numstat.stdout) {
+    for (const line of numstat.stdout.split("\n")) {
+      const [addStr, delStr] = line.split("	");
+      const add = Number.parseInt(addStr ?? "0", 10);
+      const del = Number.parseInt(delStr ?? "0", 10);
+      if (Number.isFinite(add)) linesAdded += add;
+      if (Number.isFinite(del)) linesRemoved += del;
+    }
+  }
+  return { filesModified, linesAdded, linesRemoved };
+}
+async function runFix(cwd, options = {}) {
+  const progress = progressFactory3();
+  const stateDir = resolveStateDir(cwd);
+  const jobId = options.jobId ?? generateJobId();
+  const model = options.model ?? DEFAULT_MODEL3;
+  const reasoning = options.reasoning ?? DEFAULT_EFFORT2;
+  const timeout = options.timeout ?? DEFAULT_TIMEOUT_MS3;
+  const minQuota = options.minQuota ?? 1;
+  const log = (msg) => appendLog(stateDir, jobId, msg);
+  if (!options.findingsPath) {
+    emit3({ status: "failed", jobId, error: "Missing --findings <path>; provide the approved findings JSON." });
+    process.exit(1);
+  }
+  const findingsAbs = (0, import_node_path8.resolve)(cwd, options.findingsPath);
+  let findings;
+  try {
+    findings = loadFindings(findingsAbs);
+  } catch (err) {
+    emit3({ status: "failed", jobId, error: `Could not read findings file ${findingsAbs}: ${err.message}` });
+    process.exit(1);
+  }
+  if (findings.length === 0) {
+    emit3({ status: "failed", jobId, error: "No findings to fix (empty list after parsing)." });
+    process.exit(1);
+  }
+  log(`fix start: model=${model} findings=${findings.length} source=${findingsAbs}`);
+  const snapshot = readSnapshot(stateDir);
+  const gate = evaluateGate(snapshot, { minRemaining: minQuota });
+  if (!gate.ok) {
+    log(`quota blocked: remaining=${gate.remaining} resetAt=${gate.resetAt}`);
+    emit3({
+      status: "blocked",
+      reason: gate.reason,
+      resetAt: gate.resetAt,
+      remaining: gate.remaining,
+      message: `Copilot quota exhausted; apply these fixes directly. Resets at ${gate.resetAt || "unknown"}.`
+    });
+    return;
+  }
+  if (gate.ok && "warning" in gate && gate.warning) progress(gate.warning);
+  let repoRoot;
+  try {
+    repoRoot = resolveRepoRoot(cwd);
+  } catch (err) {
+    emit3({ status: "failed", jobId, error: `Not a git repository: ${err.message}` });
+    process.exit(1);
+  }
+  let preFixSnapshot = false;
+  const dirty = tryGit2(["status", "--porcelain"], repoRoot);
+  if (dirty.ok && dirty.stdout.trim()) {
+    tryGit2(["add", "-A"], repoRoot);
+    const c = tryGit2(["commit", "-m", "chore: pre-fix snapshot (copilot fix baseline)"], repoRoot);
+    preFixSnapshot = c.ok;
+    if (c.ok) {
+      progress("Committed pre-existing changes as a baseline snapshot before applying fixes.");
+      log("pre-fix snapshot commit created");
+    } else {
+      log(`pre-fix snapshot commit failed: ${c.stderr}`);
+    }
+  }
+  const baselineCommit = gitHead(repoRoot);
+  const client = new CopilotClient({ workingDirectory: repoRoot, env: process.env });
+  let cleanupDone = false;
+  const finalizeFailure = async (error) => {
+    if (cleanupDone) return;
+    cleanupDone = true;
+    await client.forceStop().catch(() => {
+    });
+    emit3({ status: "failed", jobId, error });
+  };
+  const onSignal = async () => {
+    progress("Received interrupt signal; aborting fix session.");
+    await finalizeFailure("Interrupted by signal");
+    process.exit(130);
+  };
+  process.on("SIGINT", () => void onSignal());
+  process.on("SIGTERM", () => void onSignal());
+  try {
+    await client.start();
+  } catch (err) {
+    await finalizeFailure(`Failed to start Copilot CLI: ${err.message}`);
+    process.exit(1);
+  }
+  const auth = await checkAuth(client);
+  if (!auth.ok) {
+    await finalizeFailure(`Not authenticated: ${auth.message}`);
+    await client.stop().catch(() => {
+    });
+    process.exit(1);
+  }
+  log(`auth ok: ${auth.authType}${auth.login ? ` as ${auth.login}` : ""}`);
+  const permissionHandler = makePermissionHandler({
+    allowShell: options.allowShell ?? false,
+    allowUrl: options.allowUrl ?? false,
+    worktreePath: repoRoot,
+    appendLog: log
+  });
+  const session = await client.createSession({
+    clientName: `${CLIENT_NAME}/${PLUGIN_VERSION}`,
+    model,
+    reasoningEffort: reasoning,
+    workingDirectory: repoRoot,
+    infiniteSessions: { enabled: false },
+    onPermissionRequest: permissionHandler
+  });
+  const stream = attachStream({ session, stateDir, appendLog: log, progress });
+  progress(`Applying ${findings.length} approved fix(es) (model=${model})\u2026`);
+  await session.send({ prompt: buildFixPrompt(findings) });
+  let completionResult = null;
+  let timedOut = false;
+  const timeoutHandle = setTimeout(() => {
+    timedOut = true;
+    progress(`Timeout after ${timeout}ms \u2014 aborting session.`);
+    session.abort().catch((e) => log(`abort error: ${e.message}`));
+  }, timeout);
+  try {
+    completionResult = await stream.completion;
+  } catch (err) {
+    clearTimeout(timeoutHandle);
+    stream.dispose();
+    await session.disconnect().catch(() => {
+    });
+    await client.stop().catch(() => {
+    });
+    await finalizeFailure(err.message);
+    process.exit(1);
+  }
+  clearTimeout(timeoutHandle);
+  let premiumRequestCost;
+  try {
+    const metrics = await session.rpc.usage.getMetrics();
+    premiumRequestCost = metrics.totalPremiumRequestCost;
+  } catch (e) {
+    log(`usage.getMetrics failed: ${e.message}`);
+  }
+  await session.disconnect().catch((e) => log(`disconnect warn: ${e.message}`));
+  const shutdownResult = await Promise.race([
+    stream.shutdown,
+    new Promise((res) => setTimeout(() => res(null), 5e3))
+  ]);
+  stream.dispose();
+  await fetchQuota(client, stateDir).catch(() => null);
+  await client.stop().catch(() => {
+  });
+  const success = completionResult?.success !== false && !timedOut;
+  if (!success) {
+    await finalizeFailure(timedOut ? `Timed out after ${timeout}ms` : "Fix session did not complete successfully.");
+    process.exit(0);
+  }
+  const assistant = stream.getLastAssistantMessage() ?? "";
+  const report = parseApplyReport(assistant, findings);
+  const diff = computeStagedDiff(repoRoot, baselineCommit);
+  const summary = completionResult?.summary && completionResult.summary.trim() || `Applied ${report.applied.length}/${findings.length} finding(s); ${report.skipped.length} skipped.`;
+  const envelope = {
+    status: "fixed",
+    jobId,
+    summary,
+    baselineCommit,
+    preFixSnapshot,
+    filesModified: diff.filesModified,
+    linesAdded: diff.linesAdded,
+    linesRemoved: diff.linesRemoved,
+    applied: report.applied,
+    skipped: report.skipped,
+    premiumRequestCost: premiumRequestCost ?? shutdownResult?.premiumRequestCost ?? 0,
+    model: shutdownResult?.currentModel ?? model,
+    quotaRemaining: summarize(readSnapshot(stateDir))
+  };
+  const envelopeJson = emit3(envelope);
+  if (options.writePath) {
+    const outPath = (0, import_node_path8.resolve)(cwd, options.writePath);
+    (0, import_node_fs8.mkdirSync)((0, import_node_path8.dirname)(outPath), { recursive: true });
+    (0, import_node_fs8.writeFileSync)(outPath, envelopeJson + "\n", "utf-8");
+    progress(`Report saved to ${outPath}`);
+  }
+  progress(
+    `Fix done \u2014 applied=${report.applied.length} skipped=${report.skipped.length} files=${diff.filesModified.length} (+${diff.linesAdded}/-${diff.linesRemoved})`
+  );
+  log(`fix done: applied=${report.applied.length} skipped=${report.skipped.length} files=${diff.filesModified.length}`);
+  progress(`Job log: ${jobLogPath(stateDir, jobId)}`);
+}
+
+// src/lib/zombie.ts
+var import_node_fs9 = require("node:fs");
 var STALE_LOG_MS = 6e4;
 function isProcessAlive(pid) {
   try {
@@ -9357,8 +9742,8 @@ function isProcessAlive(pid) {
 }
 function logMtimeMs(path) {
   try {
-    if (!(0, import_node_fs8.existsSync)(path)) return null;
-    return (0, import_node_fs8.statSync)(path).mtimeMs;
+    if (!(0, import_node_fs9.existsSync)(path)) return null;
+    return (0, import_node_fs9.statSync)(path).mtimeMs;
   } catch {
     return null;
   }
@@ -9536,7 +9921,7 @@ async function runResult(cwd, options = {}) {
 }
 
 // src/commands/background.ts
-var import_node_child_process4 = require("node:child_process");
+var import_node_child_process5 = require("node:child_process");
 
 // src/lib/args.ts
 function extractTask(args, flags) {
@@ -9569,7 +9954,7 @@ function enqueueBackground(command, args, flags, cwd) {
   createJob(stateDir, job);
   appendLog(stateDir, jobId, `Queued for background execution: ${command} "${summary}"`);
   const scriptPath = getScriptPath();
-  const child = (0, import_node_child_process4.spawn)(process.execPath, [scriptPath, "_worker", "--job-id", jobId, "--cwd", cwd], {
+  const child = (0, import_node_child_process5.spawn)(process.execPath, [scriptPath, "_worker", "--job-id", jobId, "--cwd", cwd], {
     cwd,
     env: { ...process.env, COPILOT_COMPANION_SESSION_ID: getSessionId() ?? "" },
     detached: true,
@@ -9692,16 +10077,20 @@ function printUsage() {
       "                               [--timeout <ms>] [--min-quota <n>]",
       "                               [--background] [--write <path>]",
       "  copilot-companion review [focus...] [--adversarial] [--base <ref>]",
-      "                           [--scope auto|working-tree|branch]",
+      "                           [--scope auto|working-tree|branch] [--fix]",
       "                           [--model <id>] [--reasoning <low|medium|high|xhigh>]",
       "                           [--timeout <ms>] [--min-quota <n>] [--background]",
+      "  copilot-companion fix --findings <path> [--model <id>]",
+      "                        [--reasoning <low|medium|high|xhigh>]",
+      "                        [--timeout <ms>] [--min-quota <n>] [--write <path>]",
       "  copilot-companion status [job-id] [--all] [--json]",
       "  copilot-companion result [job-id] [--json]",
       "",
       "Commands:",
       "  setup       Check GitHub Copilot authentication, available models, quota",
       "  implement   Delegate an implementation task to GitHub Copilot",
-      "  review      Run a Copilot code review (markdown output)",
+      "  review      Run a Copilot code review (markdown, or JSON findings with --fix)",
+      "  fix         Apply Claude-Code-approved review findings to the working tree",
       "  status      Show quota plus background job status",
       "  result      Retrieve a background job's output"
     ].join("\n")
@@ -9714,6 +10103,7 @@ var BOOLEAN_FLAGS = /* @__PURE__ */ new Set([
   "allow-url",
   "background",
   "check",
+  "fix",
   "help",
   "json",
   "no-worktree",
@@ -9830,7 +10220,22 @@ async function main() {
         model: flagString2(flags, "model"),
         reasoning,
         timeout: flagNumber2(flags, "timeout"),
-        minQuota: flagNumber2(flags, "min-quota")
+        minQuota: flagNumber2(flags, "min-quota"),
+        fix: flags["fix"] === true
+      });
+      break;
+    }
+    case "fix": {
+      const reasoning = flagEnum(flags, "reasoning", ["low", "medium", "high", "xhigh"]);
+      await runFix(import_node_process.default.cwd(), {
+        findingsPath: flagString2(flags, "findings"),
+        model: flagString2(flags, "model"),
+        reasoning,
+        timeout: flagNumber2(flags, "timeout"),
+        minQuota: flagNumber2(flags, "min-quota"),
+        allowShell: flags["allow-shell"] === true,
+        allowUrl: flags["allow-url"] === true,
+        writePath: flagString2(flags, "write")
       });
       break;
     }
