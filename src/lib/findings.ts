@@ -34,18 +34,29 @@ const VALID_SEVERITIES: ReadonlySet<string> = new Set(['blocker', 'major', 'mino
  * array/object scan if no fence is present. Returns null on any failure.
  */
 export function extractJsonBlock(text: string): unknown {
-  const fenceRe = /```(?:json)?\s*\n([\s\S]*?)```/gi;
-  let lastMatch: string | undefined;
+  // Collect fenced ```json blocks. `\s*` (not `\s*\n`) so a single-line fence
+  // like ```json {...}``` is matched too. Try the LAST fence first — that is
+  // the structured payload we ask the model to emit at the very end.
+  const fenceRe = /```(?:json)?\s*([\s\S]*?)```/gi;
+  const fenced: string[] = [];
   for (const m of text.matchAll(fenceRe)) {
-    if (m[1]) lastMatch = m[1];
+    if (m[1] && m[1].trim()) fenced.push(m[1]);
   }
-  const candidates = lastMatch ? [lastMatch] : [];
-  // Fallback: grab the last top-level [...] span if no fence was found.
-  if (candidates.length === 0) {
-    const start = text.lastIndexOf('[');
-    const end = text.lastIndexOf(']');
-    if (start !== -1 && end > start) candidates.push(text.slice(start, end + 1));
-  }
+  const candidates = fenced.reverse();
+  // Fallback for un-fenced payloads: the last top-level array AND object span
+  // (object covers the apply-report `{applied,skipped}` shape and `{findings}`).
+  const lastSpan = (open: string, close: string): string | undefined => {
+    const start = text.lastIndexOf(open);
+    const end = text.lastIndexOf(close);
+    return start !== -1 && end > start ? text.slice(start, end + 1) : undefined;
+  };
+  // Try the longest (outermost) span first: for an apply-report object the
+  // `{…}` span encloses inner `[…]` arrays, so length-desc avoids grabbing a
+  // trailing inner `[]` and parsing it as the whole payload.
+  const spans = [lastSpan('[', ']'), lastSpan('{', '}')]
+    .filter((s): s is string => !!s)
+    .sort((a, b) => b.length - a.length);
+  candidates.push(...spans);
   for (const c of candidates) {
     try {
       return JSON.parse(c.trim());
@@ -68,8 +79,9 @@ export function normalizeFindings(parsed: unknown): Finding[] {
       ? (parsed as { findings: unknown[] }).findings
       : [];
   const out: Finding[] = [];
-  let auto = 0;
-  for (const raw of arr) {
+  const seen = new Set<string>();
+  for (let i = 0; i < arr.length; i++) {
+    const raw = arr[i];
     if (!raw || typeof raw !== 'object') continue;
     const r = raw as Record<string, unknown>;
     const file = typeof r['file'] === 'string' ? r['file'] : '';
@@ -78,7 +90,11 @@ export function normalizeFindings(parsed: unknown): Finding[] {
     const sev = typeof r['severity'] === 'string' && VALID_SEVERITIES.has(r['severity'])
       ? (r['severity'] as FindingSeverity)
       : 'major';
-    const id = typeof r['id'] === 'string' && r['id'].trim() ? r['id'].trim() : `finding-${++auto}`;
+    // Ensure ids are unique — a model-supplied id can collide with a generated
+    // `finding-N`, and duplicate ids break per-finding approval/accounting.
+    let id = typeof r['id'] === 'string' && r['id'].trim() ? r['id'].trim() : `finding-${i + 1}`;
+    if (seen.has(id)) id = `${id}-${i + 1}`;
+    seen.add(id);
     out.push({
       id,
       file,

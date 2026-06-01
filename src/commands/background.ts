@@ -164,6 +164,7 @@ export async function runWorker(jobId: string, cwd: string): Promise<void> {
         reasoning: effort,
         timeout: flagNumber(flags, 'timeout'),
         minQuota: flagNumber(flags, 'min-quota'),
+        fix: flags['fix'] === true,
         jobId,
       };
       await runReview(cwd, reviewOpts);

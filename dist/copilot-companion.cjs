@@ -7621,7 +7621,7 @@ function evaluateGate(snapshot, opts) {
   if (metered.length === 0) {
     return { ok: true, reason: "unlimited" };
   }
-  if (metered.every((q) => q.remainingPercentage <= 0) && metered.some((q) => q.usageAllowedWithExhaustedQuota)) {
+  if (metered.every((q) => q.remainingPercentage <= 0) && metered.some((q) => q.usageAllowedWithExhaustedQuota || q.overageAllowedWithExhaustedQuota)) {
     return { ok: true, reason: "overage_allowed" };
   }
   let minRemainingAbs = Number.POSITIVE_INFINITY;
@@ -9157,17 +9157,19 @@ function buildReviewPrompt(kind, vars) {
 // src/lib/findings.ts
 var VALID_SEVERITIES = /* @__PURE__ */ new Set(["blocker", "major", "minor"]);
 function extractJsonBlock(text) {
-  const fenceRe = /```(?:json)?\s*\n([\s\S]*?)```/gi;
-  let lastMatch;
+  const fenceRe = /```(?:json)?\s*([\s\S]*?)```/gi;
+  const fenced = [];
   for (const m of text.matchAll(fenceRe)) {
-    if (m[1]) lastMatch = m[1];
+    if (m[1] && m[1].trim()) fenced.push(m[1]);
   }
-  const candidates = lastMatch ? [lastMatch] : [];
-  if (candidates.length === 0) {
-    const start = text.lastIndexOf("[");
-    const end = text.lastIndexOf("]");
-    if (start !== -1 && end > start) candidates.push(text.slice(start, end + 1));
-  }
+  const candidates = fenced.reverse();
+  const lastSpan = (open, close) => {
+    const start = text.lastIndexOf(open);
+    const end = text.lastIndexOf(close);
+    return start !== -1 && end > start ? text.slice(start, end + 1) : void 0;
+  };
+  const spans = [lastSpan("[", "]"), lastSpan("{", "}")].filter((s) => !!s).sort((a, b) => b.length - a.length);
+  candidates.push(...spans);
   for (const c of candidates) {
     try {
       return JSON.parse(c.trim());
@@ -9179,15 +9181,18 @@ function extractJsonBlock(text) {
 function normalizeFindings(parsed) {
   const arr = Array.isArray(parsed) ? parsed : parsed && typeof parsed === "object" && Array.isArray(parsed.findings) ? parsed.findings : [];
   const out = [];
-  let auto = 0;
-  for (const raw of arr) {
+  const seen = /* @__PURE__ */ new Set();
+  for (let i = 0; i < arr.length; i++) {
+    const raw = arr[i];
     if (!raw || typeof raw !== "object") continue;
     const r = raw;
     const file = typeof r["file"] === "string" ? r["file"] : "";
     const title = typeof r["title"] === "string" ? r["title"] : "";
     if (!file || !title) continue;
     const sev = typeof r["severity"] === "string" && VALID_SEVERITIES.has(r["severity"]) ? r["severity"] : "major";
-    const id = typeof r["id"] === "string" && r["id"].trim() ? r["id"].trim() : `finding-${++auto}`;
+    let id = typeof r["id"] === "string" && r["id"].trim() ? r["id"].trim() : `finding-${i + 1}`;
+    if (seen.has(id)) id = `${id}-${i + 1}`;
+    seen.add(id);
     out.push({
       id,
       file,
@@ -9607,7 +9612,19 @@ async function runFix(cwd, options = {}) {
       log(`pre-fix snapshot commit failed: ${c.stderr}`);
     }
   }
+  if (dirty.ok && dirty.stdout.trim() && !preFixSnapshot) {
+    emit3({
+      status: "failed",
+      jobId,
+      error: "Could not snapshot your uncommitted changes (git commit failed); aborting so the fix diff is not mixed with pre-existing work. Commit or stash manually, then retry."
+    });
+    process.exit(1);
+  }
   const baselineCommit = gitHead(repoRoot);
+  if (!baselineCommit) {
+    emit3({ status: "failed", jobId, error: "fix requires at least one commit to diff against (repository has no commits yet)." });
+    process.exit(1);
+  }
   const client = new CopilotClient({ workingDirectory: repoRoot, env: process.env });
   let cleanupDone = false;
   const finalizeFailure = async (error) => {
@@ -9696,6 +9713,7 @@ async function runFix(cwd, options = {}) {
     await finalizeFailure(timedOut ? `Timed out after ${timeout}ms` : "Fix session did not complete successfully.");
     process.exit(0);
   }
+  cleanupDone = true;
   const assistant = stream.getLastAssistantMessage() ?? "";
   const report = parseApplyReport(assistant, findings);
   const diff = computeStagedDiff(repoRoot, baselineCommit);
@@ -10030,6 +10048,7 @@ async function runWorker(jobId, cwd) {
         reasoning: effort,
         timeout: flagNumber(flags, "timeout"),
         minQuota: flagNumber(flags, "min-quota"),
+        fix: flags["fix"] === true,
         jobId
       };
       await runReview(cwd, reviewOpts);

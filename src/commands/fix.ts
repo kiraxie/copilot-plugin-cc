@@ -274,7 +274,25 @@ export async function runFix(cwd: string, options: FixOptions = {}): Promise<voi
       log(`pre-fix snapshot commit failed: ${c.stderr}`);
     }
   }
+  // If the tree was dirty but the snapshot commit failed, the baseline is
+  // contaminated — proceeding would mix the user's pre-existing changes into
+  // the reported fix diff. Abort instead.
+  if (dirty.ok && dirty.stdout.trim() && !preFixSnapshot) {
+    emit({
+      status: 'failed',
+      jobId,
+      error: 'Could not snapshot your uncommitted changes (git commit failed); aborting so the fix diff is not mixed with pre-existing work. Commit or stash manually, then retry.',
+    });
+    process.exit(1);
+  }
+
   const baselineCommit = gitHead(repoRoot);
+  // fix diffs the applied changes against this baseline; with no commit to
+  // diff against (unborn HEAD) the diff would silently report nothing.
+  if (!baselineCommit) {
+    emit({ status: 'failed', jobId, error: 'fix requires at least one commit to diff against (repository has no commits yet).' });
+    process.exit(1);
+  }
 
   // 4. Copilot client (write-enabled, real working tree) ---------------------
   const client = new CopilotClient({ workingDirectory: repoRoot, env: process.env });
@@ -373,6 +391,10 @@ export async function runFix(cwd: string, options: FixOptions = {}): Promise<voi
     await finalizeFailure(timedOut ? `Timed out after ${timeout}ms` : 'Fix session did not complete successfully.');
     process.exit(0);
   }
+
+  // Past the point of no return: claim the single-envelope slot so a late
+  // SIGINT/SIGTERM during teardown cannot emit a second (failed) stdout line.
+  cleanupDone = true;
 
   // 7. Diff stats + apply report ---------------------------------------------
   const assistant = stream.getLastAssistantMessage() ?? '';

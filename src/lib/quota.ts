@@ -169,7 +169,7 @@ export function evaluateGate(
 
   if (
     metered.every((q) => q.remainingPercentage <= 0) &&
-    metered.some((q) => q.usageAllowedWithExhaustedQuota)
+    metered.some((q) => q.usageAllowedWithExhaustedQuota || q.overageAllowedWithExhaustedQuota)
   ) {
     return { ok: true, reason: 'overage_allowed' };
   }
