@@ -14,6 +14,8 @@ Supports:
 - `--no-worktree` — run in the current working directory instead of an isolated branch (dangerous)
 - `--allow-shell` — permit Copilot to run shell commands inside the worktree (needed for tests/builds)
 - `--allow-url` — permit Copilot to fetch URLs
+- `--context <text>` — extra context/intent injected into Copilot's system message. Use this to pass decisions or constraints that live only in this Claude Code conversation (Copilot already reads the repo's CLAUDE.md/AGENTS.md on its own, so don't repeat those).
+- `--instructions <file>` — same as `--context`, but the content is read from a file
 - `--timeout <ms>` — hard timeout for the session (default 30 min)
 - `--background` — enqueue as a persistent background job (returns immediately with a job id; survives session end, but does NOT auto-notify the main session — the user must run `/copilot:status` manually). Prefer harness background (see below) unless persistence across sessions is required.
 - `--write <path>` — also write the final report to a file

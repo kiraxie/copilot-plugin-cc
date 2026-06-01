@@ -165,6 +165,8 @@ export async function runWorker(jobId: string, cwd: string): Promise<void> {
         timeout: flagNumber(flags, 'timeout'),
         minQuota: flagNumber(flags, 'min-quota'),
         fix: flags['fix'] === true,
+        context: flagString(flags, 'context'),
+        instructionsPath: flagString(flags, 'instructions'),
         jobId,
       };
       await runReview(cwd, reviewOpts);
@@ -178,6 +180,8 @@ export async function runWorker(jobId: string, cwd: string): Promise<void> {
         allowUrl: flags['allow-url'] === true,
         minQuota: flagNumber(flags, 'min-quota'),
         writePath: flagString(flags, 'write'),
+        context: flagString(flags, 'context'),
+        instructionsPath: flagString(flags, 'instructions'),
         jobId,
       };
       const task = extractTask(args, flags);

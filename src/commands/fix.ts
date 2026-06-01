@@ -31,6 +31,7 @@ import { makePermissionHandler } from '../lib/permission.js';
 import { attachStream } from '../lib/event-stream.js';
 import { resolveRepoRoot } from '../lib/worktree.js';
 import { extractJsonBlock, normalizeFindings, type Finding } from '../lib/findings.js';
+import { buildSystemMessage, resolveExtraContext } from '../lib/system-message.js';
 import { CLIENT_NAME, PLUGIN_VERSION } from '../lib/version.js';
 
 export interface FixOptions {
@@ -43,6 +44,10 @@ export interface FixOptions {
   allowShell?: boolean;
   allowUrl?: boolean;
   writePath?: string;
+  /** Inline extra context appended to Copilot's system message. */
+  context?: string;
+  /** Path to a file whose contents are appended to Copilot's system message. */
+  instructionsPath?: string;
   jobId?: string;
 }
 
@@ -334,6 +339,12 @@ export async function runFix(cwd: string, options: FixOptions = {}): Promise<voi
     appendLog: log,
   });
 
+  const extraContext = resolveExtraContext(cwd, {
+    context: options.context,
+    instructionsPath: options.instructionsPath,
+    onWarn: (m) => { progress(m); log(m); },
+  });
+
   const session = await client.createSession({
     clientName: `${CLIENT_NAME}/${PLUGIN_VERSION}`,
     model,
@@ -341,6 +352,10 @@ export async function runFix(cwd: string, options: FixOptions = {}): Promise<voi
     workingDirectory: repoRoot,
     infiniteSessions: { enabled: false },
     onPermissionRequest: permissionHandler,
+    systemMessage: {
+      mode: 'append',
+      content: buildSystemMessage('fix', { extraContext }),
+    },
   });
 
   const stream = attachStream({ session, stateDir, appendLog: log, progress });

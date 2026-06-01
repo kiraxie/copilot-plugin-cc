@@ -20,6 +20,7 @@ import { readSnapshot, evaluateGate, summarize, fetchQuota } from '../lib/quota.
 import { checkAuth } from '../lib/copilot-auth.js';
 import { makePermissionHandler } from '../lib/permission.js';
 import { attachStream } from '../lib/event-stream.js';
+import { buildSystemMessage, resolveExtraContext } from '../lib/system-message.js';
 import {
   createWorktree, cleanupWorktree, commitWorktreeChanges, computeDiffStats,
   resolveRepoRoot, type WorktreeHandle,
@@ -35,6 +36,10 @@ export interface ImplementOptions {
   allowUrl?: boolean;
   minQuota?: number;
   writePath?: string;
+  /** Inline extra context appended to Copilot's system message. */
+  context?: string;
+  /** Path to a file whose contents are appended to Copilot's system message. */
+  instructionsPath?: string;
   /** Pre-allocated job id (used by the background worker to share state). */
   jobId?: string;
 }
@@ -230,6 +235,12 @@ export async function runImplement(task: string, cwd: string, options: Implement
     appendLog: log,
   });
 
+  const extraContext = resolveExtraContext(cwd, {
+    context: options.context,
+    instructionsPath: options.instructionsPath,
+    onWarn: (m) => { progress(m); log(m); },
+  });
+
   const session = await client.createSession({
     clientName: `${CLIENT_NAME}/${PLUGIN_VERSION}`,
     model,
@@ -237,6 +248,10 @@ export async function runImplement(task: string, cwd: string, options: Implement
     workingDirectory: sessionCwd,
     infiniteSessions: { enabled: false },
     onPermissionRequest: permissionHandler,
+    systemMessage: {
+      mode: 'append',
+      content: buildSystemMessage('implement', { branch: handle?.branch, extraContext }),
+    },
   });
 
   const stream = attachStream({

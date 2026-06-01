@@ -23,13 +23,16 @@ function printUsage(): void {
       '  copilot-companion implement "<task>" [--model <id>] [--reasoning <low|medium|high>]',
       '                               [--no-worktree] [--allow-shell] [--allow-url]',
       '                               [--timeout <ms>] [--min-quota <n>]',
+      '                               [--context <text>] [--instructions <file>]',
       '                               [--background] [--write <path>]',
       '  copilot-companion review [focus...] [--adversarial] [--base <ref>]',
       '                           [--scope auto|working-tree|branch] [--fix]',
       '                           [--model <id>] [--reasoning <low|medium|high|xhigh>]',
+      '                           [--context <text>] [--instructions <file>]',
       '                           [--timeout <ms>] [--min-quota <n>] [--background]',
       '  copilot-companion fix --findings <path> [--model <id>]',
       '                        [--reasoning <low|medium|high|xhigh>]',
+      '                        [--context <text>] [--instructions <file>]',
       '                        [--timeout <ms>] [--min-quota <n>] [--write <path>]',
       '  copilot-companion status [job-id] [--all] [--json]',
       '  copilot-companion result [job-id] [--json]',
@@ -177,6 +180,8 @@ async function main(): Promise<void> {
         allowUrl: flags['allow-url'] === true,
         minQuota: flagNumber(flags, 'min-quota'),
         writePath: flagString(flags, 'write'),
+        context: flagString(flags, 'context'),
+        instructionsPath: flagString(flags, 'instructions'),
       });
       break;
     }
@@ -204,6 +209,8 @@ async function main(): Promise<void> {
         timeout: flagNumber(flags, 'timeout'),
         minQuota: flagNumber(flags, 'min-quota'),
         fix: flags['fix'] === true,
+        context: flagString(flags, 'context'),
+        instructionsPath: flagString(flags, 'instructions'),
       });
       break;
     }
@@ -219,6 +226,8 @@ async function main(): Promise<void> {
         allowShell: flags['allow-shell'] === true,
         allowUrl: flags['allow-url'] === true,
         writePath: flagString(flags, 'write'),
+        context: flagString(flags, 'context'),
+        instructionsPath: flagString(flags, 'instructions'),
       });
       break;
     }

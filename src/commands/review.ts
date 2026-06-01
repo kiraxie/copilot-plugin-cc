@@ -17,6 +17,7 @@ import { attachStream } from '../lib/event-stream.js';
 import { resolveReviewTarget, collectReviewContext, type ReviewScope } from '../lib/git.js';
 import { buildReviewPrompt, type ReviewKind } from '../lib/review-prompts.js';
 import { extractJsonBlock, normalizeFindings, FINDINGS_OUTPUT_INSTRUCTION } from '../lib/findings.js';
+import { buildSystemMessage, resolveExtraContext } from '../lib/system-message.js';
 import { CLIENT_NAME, PLUGIN_VERSION } from '../lib/version.js';
 import type { ReasoningEffort } from './implement.js';
 
@@ -29,6 +30,10 @@ export interface ReviewOptions {
   reasoning?: ReasoningEffort;
   timeout?: number;
   minQuota?: number;
+  /** Inline extra context appended to Copilot's system message. */
+  context?: string;
+  /** Path to a file whose contents are appended to Copilot's system message. */
+  instructionsPath?: string;
   jobId?: string;
   /**
    * Structured-findings mode. Instead of markdown, emit a `reviewed` JSON
@@ -150,6 +155,12 @@ export async function runReview(cwd: string, options: ReviewOptions = {}): Promi
     readOnly: true,
   });
 
+  const extraContext = resolveExtraContext(cwd, {
+    context: options.context,
+    instructionsPath: options.instructionsPath,
+    onWarn: (m) => { progress(m); log(m); },
+  });
+
   // Wrap createSession so a model/parameter error (after client.start
   // succeeds) still releases the Copilot client.
   let session;
@@ -161,6 +172,10 @@ export async function runReview(cwd: string, options: ReviewOptions = {}): Promi
       workingDirectory: context.repoRoot,
       infiniteSessions: { enabled: false },
       onPermissionRequest: permissionHandler,
+      systemMessage: {
+        mode: 'append',
+        content: buildSystemMessage('review', { extraContext }),
+      },
     });
   } catch (err) {
     const msg = `Failed to create Copilot session: ${(err as Error).message}`;

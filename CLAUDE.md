@@ -80,3 +80,4 @@ Ported from the reference plugin. `{stateDir}` is `$CLAUDE_PLUGIN_DATA/state/<sl
 - **Default model** is `claude-opus-4.8`; confirmed present at `setup` time but not enforced. If unavailable, the user is told to pass `--model`.
 - **`approveAll` is not used** from the SDK. Our selective handler is the safety boundary that makes proactive orchestrator delegation safe.
 - **Dependencies**: `@github/copilot-sdk` only. No Google libs, no custom HTTP. CJS output (`"type": "module"` in package.json, `.cjs` output).
+- **System message (`src/lib/system-message.ts`)**: every session passes `systemMessage: { mode: 'append', content }` with a per-kind delegation-framing preamble plus optional caller-supplied context (`--context` / `--instructions`). We do NOT re-inject the repo's instruction files — Copilot loads `.github/copilot-instructions.md`, `AGENTS.md`, and `CLAUDE.md` from the working directory on its own (`skipCustomInstructions` defaults to false).

@@ -1027,8 +1027,8 @@ var require_semaphore = __commonJS({
         this._waiting = [];
       }
       lock(thunk) {
-        return new Promise((resolve5, reject) => {
-          this._waiting.push({ thunk, resolve: resolve5, reject });
+        return new Promise((resolve6, reject) => {
+          this._waiting.push({ thunk, resolve: resolve6, reject });
           this.runNext();
         });
       }
@@ -2518,9 +2518,9 @@ ${JSON.stringify(message, null, 4)}`);
           if (typeof cancellationStrategy.sender.enableCancellation === "function") {
             cancellationStrategy.sender.enableCancellation(requestMessage);
           }
-          return new Promise(async (resolve5, reject) => {
+          return new Promise(async (resolve6, reject) => {
             const resolveWithCleanup = (r) => {
-              resolve5(r);
+              resolve6(r);
               cancellationStrategy.sender.cleanup(id);
               disposable?.dispose();
             };
@@ -2932,10 +2932,10 @@ var require_ril = __commonJS({
         return api_1.Disposable.create(() => this.stream.off("end", listener));
       }
       write(data, encoding) {
-        return new Promise((resolve5, reject) => {
+        return new Promise((resolve6, reject) => {
           const callback = (error) => {
             if (error === void 0 || error === null) {
-              resolve5();
+              resolve6();
             } else {
               reject(error);
             }
@@ -3187,10 +3187,10 @@ var require_main = __commonJS({
     exports2.generateRandomPipeName = generateRandomPipeName;
     function createClientPipeTransport(pipeName, encoding = "utf-8") {
       let connectResolve;
-      const connected = new Promise((resolve5, _reject) => {
-        connectResolve = resolve5;
+      const connected = new Promise((resolve6, _reject) => {
+        connectResolve = resolve6;
       });
-      return new Promise((resolve5, reject) => {
+      return new Promise((resolve6, reject) => {
         let server = (0, net_1.createServer)((socket) => {
           server.close();
           connectResolve([
@@ -3201,7 +3201,7 @@ var require_main = __commonJS({
         server.on("error", reject);
         server.listen(pipeName, () => {
           server.removeListener("error", reject);
-          resolve5({
+          resolve6({
             onConnected: () => {
               return connected;
             }
@@ -3220,10 +3220,10 @@ var require_main = __commonJS({
     exports2.createServerPipeTransport = createServerPipeTransport;
     function createClientSocketTransport(port, encoding = "utf-8") {
       let connectResolve;
-      const connected = new Promise((resolve5, _reject) => {
-        connectResolve = resolve5;
+      const connected = new Promise((resolve6, _reject) => {
+        connectResolve = resolve6;
       });
-      return new Promise((resolve5, reject) => {
+      return new Promise((resolve6, reject) => {
         const server = (0, net_1.createServer)((socket) => {
           server.close();
           connectResolve([
@@ -3234,7 +3234,7 @@ var require_main = __commonJS({
         server.on("error", reject);
         server.listen(port, "127.0.0.1", () => {
           server.removeListener("error", reject);
-          resolve5({
+          resolve6({
             onConnected: () => {
               return connected;
             }
@@ -4920,8 +4920,8 @@ var CopilotSession = class {
     const effectiveTimeout = timeout ?? 6e4;
     let resolveIdle;
     let rejectWithError;
-    const idlePromise = new Promise((resolve5, reject) => {
-      resolveIdle = resolve5;
+    const idlePromise = new Promise((resolve6, reject) => {
+      resolveIdle = resolve6;
       rejectWithError = reject;
     });
     let lastAssistantMessage;
@@ -6266,7 +6266,7 @@ var CopilotClient = class _CopilotClient {
           lastError = error instanceof Error ? error : new Error(String(error));
           if (attempt < 3) {
             const delay = 100 * Math.pow(2, attempt - 1);
-            await new Promise((resolve5) => setTimeout(resolve5, delay));
+            await new Promise((resolve6) => setTimeout(resolve6, delay));
           }
         }
       }
@@ -6298,8 +6298,8 @@ var CopilotClient = class _CopilotClient {
       this.socket = null;
       try {
         if (!socket.destroyed) {
-          await new Promise((resolve5) => {
-            socket.once("close", () => resolve5());
+          await new Promise((resolve6) => {
+            socket.once("close", () => resolve6());
             socket.end();
           });
         }
@@ -6316,8 +6316,8 @@ var CopilotClient = class _CopilotClient {
       this.cliProcess = null;
       try {
         if (child.exitCode === null && child.signalCode === null) {
-          const exited = new Promise((resolve5) => {
-            child.once("exit", () => resolve5());
+          const exited = new Promise((resolve6) => {
+            child.once("exit", () => resolve6());
           });
           child.kill();
           await exited;
@@ -6847,8 +6847,8 @@ var CopilotClient = class _CopilotClient {
   async listModels() {
     await this.modelsCacheLock;
     let resolveLock;
-    this.modelsCacheLock = new Promise((resolve5) => {
-      resolveLock = resolve5;
+    this.modelsCacheLock = new Promise((resolve6) => {
+      resolveLock = resolve6;
     });
     try {
       if (this.modelsCache !== null) {
@@ -7125,7 +7125,7 @@ var CopilotClient = class _CopilotClient {
    * Start the CLI server process
    */
   async startCLIServer() {
-    return new Promise((resolve5, reject) => {
+    return new Promise((resolve6, reject) => {
       this.stderrBuffer = "";
       const args = [...this.connectionExtraArgs, "--headless", "--no-auto-update"];
       if (this.options.logLevel) {
@@ -7215,7 +7215,7 @@ var CopilotClient = class _CopilotClient {
       let resolved = false;
       if (this.connectionConfig.kind === "stdio") {
         resolved = true;
-        resolve5();
+        resolve6();
       } else {
         this.cliProcess.stdout?.on("data", (data) => {
           stdout += data.toString();
@@ -7223,7 +7223,7 @@ var CopilotClient = class _CopilotClient {
           if (match && !resolved) {
             this.runtimePort = parseInt(match[1], 10);
             resolved = true;
-            resolve5();
+            resolve6();
           }
         });
       }
@@ -7352,7 +7352,7 @@ stderr: ${stderrOutput}`
     if (!this.runtimePort) {
       throw new Error("Server port not available");
     }
-    return new Promise((resolve5, reject) => {
+    return new Promise((resolve6, reject) => {
       this.socket = new import_node_net.Socket();
       const connectionTimeout = setTimeout(() => {
         this.socket?.destroy();
@@ -7366,7 +7366,7 @@ stderr: ${stderrOutput}`
         );
         this.attachConnectionHandlers();
         this.connection.listen();
-        resolve5();
+        resolve6();
       });
       this.socket.on("error", (error) => {
         clearTimeout(connectionTimeout);
@@ -8152,8 +8152,8 @@ function emit(options, report) {
 }
 
 // src/commands/implement.ts
-var import_node_fs6 = require("node:fs");
-var import_node_path6 = require("node:path");
+var import_node_fs7 = require("node:fs");
+var import_node_path7 = require("node:path");
 
 // src/lib/permission.ts
 var import_node_fs5 = require("node:fs");
@@ -8439,6 +8439,54 @@ function attachStream(opts) {
   };
 }
 
+// src/lib/system-message.ts
+var import_node_fs6 = require("node:fs");
+var import_node_path6 = require("node:path");
+var FRAMING = {
+  implement: [
+    "You are executing a self-contained coding subtask delegated by Claude Code\u2019s orchestrator. You run headless: there is no interactive user at the keyboard for this session.",
+    "Your edits happen in an isolated git worktree, so they cannot disturb the main checkout. Do NOT run `git commit` \u2014 the plugin commits your changes for you after you finish.",
+    "Follow the repository\u2019s existing conventions and patterns (its instruction files are already loaded). Stay tightly scoped to the task; avoid unrelated refactors or formatting churn."
+  ].join("\n"),
+  fix: [
+    "You are applying code-review findings that a human has already vetted and approved, delegated by Claude Code\u2019s orchestrator. You run headless.",
+    "Edit the real working tree directly. Make the minimal, correct change for each approved finding; do not refactor unrelated code and do NOT run `git commit` (the plugin manages commits and leaves your edits staged for review).",
+    "If a finding cannot be safely applied, skip it and report why rather than forcing a change."
+  ].join("\n"),
+  review: [
+    "You are performing a code review delegated by Claude Code\u2019s orchestrator. You run headless.",
+    "This session is read-only: do not attempt to modify files. Report findings; another stage applies any fixes."
+  ].join("\n")
+};
+function resolveExtraContext(cwd, opts) {
+  const parts = [];
+  if (opts.context && opts.context.trim()) parts.push(opts.context.trim());
+  if (opts.instructionsPath) {
+    try {
+      const text = (0, import_node_fs6.readFileSync)((0, import_node_path6.resolve)(cwd, opts.instructionsPath), "utf-8").trim();
+      if (text) parts.push(text);
+    } catch (err) {
+      opts.onWarn?.(`Could not read --instructions file ${opts.instructionsPath}: ${err.message}`);
+    }
+  }
+  return parts.length > 0 ? parts.join("\n\n") : void 0;
+}
+function buildSystemMessage(kind, input = {}) {
+  const sections = [];
+  let framing = FRAMING[kind];
+  if (kind === "implement" && input.branch) {
+    framing = framing.replace("an isolated git worktree", `an isolated git worktree (branch \`${input.branch}\`)`);
+  }
+  sections.push(framing);
+  if (input.extraContext && input.extraContext.trim()) {
+    sections.push(`## Additional context from the orchestrator
+The following is context from the Claude Code session that delegated this task. Treat it as authoritative intent:
+
+${input.extraContext.trim()}`);
+  }
+  return sections.join("\n\n");
+}
+
 // src/commands/implement.ts
 var DEFAULT_MODEL2 = "claude-opus-4.8";
 var DEFAULT_EFFORT = "medium";
@@ -8505,7 +8553,7 @@ async function runImplement(task, cwd, options = {}) {
   if (useWorktree) {
     try {
       const repoRoot = resolveRepoRoot(cwd);
-      const preferredPath = (0, import_node_path6.join)(stateDir, "worktrees", jobId);
+      const preferredPath = (0, import_node_path7.join)(stateDir, "worktrees", jobId);
       handle = createWorktree(jobId, repoRoot, {
         preferredPath,
         onWarn: (m) => {
@@ -8576,13 +8624,25 @@ async function runImplement(task, cwd, options = {}) {
     worktreePath: sessionCwd,
     appendLog: log
   });
+  const extraContext = resolveExtraContext(cwd, {
+    context: options.context,
+    instructionsPath: options.instructionsPath,
+    onWarn: (m) => {
+      progress(m);
+      log(m);
+    }
+  });
   const session = await client.createSession({
     clientName: `${CLIENT_NAME}/${PLUGIN_VERSION}`,
     model,
     reasoningEffort: reasoning,
     workingDirectory: sessionCwd,
     infiniteSessions: { enabled: false },
-    onPermissionRequest: permissionHandler
+    onPermissionRequest: permissionHandler,
+    systemMessage: {
+      mode: "append",
+      content: buildSystemMessage("implement", { branch: handle?.branch, extraContext })
+    }
   });
   const stream = attachStream({
     session,
@@ -8687,9 +8747,9 @@ async function runImplement(task, cwd, options = {}) {
   };
   const envelopeJson = emit2(envelope);
   if (options.writePath) {
-    const outPath = (0, import_node_path6.resolve)(cwd, options.writePath);
-    (0, import_node_fs6.mkdirSync)((0, import_node_path6.dirname)(outPath), { recursive: true });
-    (0, import_node_fs6.writeFileSync)(outPath, envelopeJson + "\n", "utf-8");
+    const outPath = (0, import_node_path7.resolve)(cwd, options.writePath);
+    (0, import_node_fs7.mkdirSync)((0, import_node_path7.dirname)(outPath), { recursive: true });
+    (0, import_node_fs7.writeFileSync)(outPath, envelopeJson + "\n", "utf-8");
     progress(`Report saved to ${outPath}`);
   }
   log(`implement done: branch=${envelope.branch ?? "none"} files=${envelope.filesModified.length} premiumCost=${envelope.premiumRequestCost}`);
@@ -8698,8 +8758,8 @@ async function runImplement(task, cwd, options = {}) {
 
 // src/lib/git.ts
 var import_node_child_process3 = require("node:child_process");
-var import_node_fs7 = require("node:fs");
-var import_node_path7 = require("node:path");
+var import_node_fs8 = require("node:fs");
+var import_node_path8 = require("node:path");
 var MAX_UNTRACKED_BYTES = 24 * 1024;
 var DEFAULT_INLINE_DIFF_MAX_FILES = 2;
 var DEFAULT_INLINE_DIFF_MAX_BYTES = 256 * 1024;
@@ -8836,12 +8896,12 @@ function formatSection(title, body) {
   return [`## ${title}`, "", body.trim() ? body.trim() : "(none)", ""].join("\n");
 }
 function formatUntrackedFile(cwd, relativePath) {
-  const absolute = (0, import_node_path7.join)(cwd, relativePath);
-  if (!(0, import_node_fs7.existsSync)(absolute)) return `### ${relativePath}
+  const absolute = (0, import_node_path8.join)(cwd, relativePath);
+  if (!(0, import_node_fs8.existsSync)(absolute)) return `### ${relativePath}
 (skipped: missing)`;
   let stat;
   try {
-    stat = (0, import_node_fs7.statSync)(absolute);
+    stat = (0, import_node_fs8.statSync)(absolute);
   } catch {
     return `### ${relativePath}
 (skipped: unreadable)`;
@@ -8852,7 +8912,7 @@ function formatUntrackedFile(cwd, relativePath) {
 (skipped: ${stat.size} bytes exceeds ${MAX_UNTRACKED_BYTES} byte limit)`;
   let buffer;
   try {
-    buffer = (0, import_node_fs7.readFileSync)(absolute);
+    buffer = (0, import_node_fs8.readFileSync)(absolute);
   } catch {
     return `### ${relativePath}
 (skipped: unreadable)`;
@@ -9332,6 +9392,14 @@ ${FINDINGS_OUTPUT_INSTRUCTION}`;
     appendLog: log,
     readOnly: true
   });
+  const extraContext = resolveExtraContext(cwd, {
+    context: options.context,
+    instructionsPath: options.instructionsPath,
+    onWarn: (m) => {
+      progress(m);
+      log(m);
+    }
+  });
   let session;
   try {
     session = await client.createSession({
@@ -9340,7 +9408,11 @@ ${FINDINGS_OUTPUT_INSTRUCTION}`;
       reasoningEffort: reasoning,
       workingDirectory: context.repoRoot,
       infiniteSessions: { enabled: false },
-      onPermissionRequest: permissionHandler
+      onPermissionRequest: permissionHandler,
+      systemMessage: {
+        mode: "append",
+        content: buildSystemMessage("review", { extraContext })
+      }
     });
   } catch (err) {
     const msg = `Failed to create Copilot session: ${err.message}`;
@@ -9445,8 +9517,8 @@ ${reviewBody}
 
 // src/commands/fix.ts
 var import_node_child_process4 = require("node:child_process");
-var import_node_fs8 = require("node:fs");
-var import_node_path8 = require("node:path");
+var import_node_fs9 = require("node:fs");
+var import_node_path9 = require("node:path");
 var DEFAULT_MODEL3 = "claude-opus-4.8";
 var DEFAULT_EFFORT2 = "high";
 var DEFAULT_TIMEOUT_MS3 = 30 * 60 * 1e3;
@@ -9474,7 +9546,7 @@ function emit3(env) {
   return json;
 }
 function loadFindings(path) {
-  const raw = (0, import_node_fs8.readFileSync)(path, "utf-8");
+  const raw = (0, import_node_fs9.readFileSync)(path, "utf-8");
   return normalizeFindings(JSON.parse(raw));
 }
 function buildFixPrompt(findings) {
@@ -9565,7 +9637,7 @@ async function runFix(cwd, options = {}) {
     emit3({ status: "failed", jobId, error: "Missing --findings <path>; provide the approved findings JSON." });
     process.exit(1);
   }
-  const findingsAbs = (0, import_node_path8.resolve)(cwd, options.findingsPath);
+  const findingsAbs = (0, import_node_path9.resolve)(cwd, options.findingsPath);
   let findings;
   try {
     findings = loadFindings(findingsAbs);
@@ -9661,13 +9733,25 @@ async function runFix(cwd, options = {}) {
     worktreePath: repoRoot,
     appendLog: log
   });
+  const extraContext = resolveExtraContext(cwd, {
+    context: options.context,
+    instructionsPath: options.instructionsPath,
+    onWarn: (m) => {
+      progress(m);
+      log(m);
+    }
+  });
   const session = await client.createSession({
     clientName: `${CLIENT_NAME}/${PLUGIN_VERSION}`,
     model,
     reasoningEffort: reasoning,
     workingDirectory: repoRoot,
     infiniteSessions: { enabled: false },
-    onPermissionRequest: permissionHandler
+    onPermissionRequest: permissionHandler,
+    systemMessage: {
+      mode: "append",
+      content: buildSystemMessage("fix", { extraContext })
+    }
   });
   const stream = attachStream({ session, stateDir, appendLog: log, progress });
   progress(`Applying ${findings.length} approved fix(es) (model=${model})\u2026`);
@@ -9735,9 +9819,9 @@ async function runFix(cwd, options = {}) {
   };
   const envelopeJson = emit3(envelope);
   if (options.writePath) {
-    const outPath = (0, import_node_path8.resolve)(cwd, options.writePath);
-    (0, import_node_fs8.mkdirSync)((0, import_node_path8.dirname)(outPath), { recursive: true });
-    (0, import_node_fs8.writeFileSync)(outPath, envelopeJson + "\n", "utf-8");
+    const outPath = (0, import_node_path9.resolve)(cwd, options.writePath);
+    (0, import_node_fs9.mkdirSync)((0, import_node_path9.dirname)(outPath), { recursive: true });
+    (0, import_node_fs9.writeFileSync)(outPath, envelopeJson + "\n", "utf-8");
     progress(`Report saved to ${outPath}`);
   }
   progress(
@@ -9748,7 +9832,7 @@ async function runFix(cwd, options = {}) {
 }
 
 // src/lib/zombie.ts
-var import_node_fs9 = require("node:fs");
+var import_node_fs10 = require("node:fs");
 var STALE_LOG_MS = 6e4;
 function isProcessAlive(pid) {
   try {
@@ -9760,8 +9844,8 @@ function isProcessAlive(pid) {
 }
 function logMtimeMs(path) {
   try {
-    if (!(0, import_node_fs9.existsSync)(path)) return null;
-    return (0, import_node_fs9.statSync)(path).mtimeMs;
+    if (!(0, import_node_fs10.existsSync)(path)) return null;
+    return (0, import_node_fs10.statSync)(path).mtimeMs;
   } catch {
     return null;
   }
@@ -10049,6 +10133,8 @@ async function runWorker(jobId, cwd) {
         timeout: flagNumber(flags, "timeout"),
         minQuota: flagNumber(flags, "min-quota"),
         fix: flags["fix"] === true,
+        context: flagString(flags, "context"),
+        instructionsPath: flagString(flags, "instructions"),
         jobId
       };
       await runReview(cwd, reviewOpts);
@@ -10062,6 +10148,8 @@ async function runWorker(jobId, cwd) {
         allowUrl: flags["allow-url"] === true,
         minQuota: flagNumber(flags, "min-quota"),
         writePath: flagString(flags, "write"),
+        context: flagString(flags, "context"),
+        instructionsPath: flagString(flags, "instructions"),
         jobId
       };
       const task = extractTask(args, flags);
@@ -10094,13 +10182,16 @@ function printUsage() {
       '  copilot-companion implement "<task>" [--model <id>] [--reasoning <low|medium|high>]',
       "                               [--no-worktree] [--allow-shell] [--allow-url]",
       "                               [--timeout <ms>] [--min-quota <n>]",
+      "                               [--context <text>] [--instructions <file>]",
       "                               [--background] [--write <path>]",
       "  copilot-companion review [focus...] [--adversarial] [--base <ref>]",
       "                           [--scope auto|working-tree|branch] [--fix]",
       "                           [--model <id>] [--reasoning <low|medium|high|xhigh>]",
+      "                           [--context <text>] [--instructions <file>]",
       "                           [--timeout <ms>] [--min-quota <n>] [--background]",
       "  copilot-companion fix --findings <path> [--model <id>]",
       "                        [--reasoning <low|medium|high|xhigh>]",
+      "                        [--context <text>] [--instructions <file>]",
       "                        [--timeout <ms>] [--min-quota <n>] [--write <path>]",
       "  copilot-companion status [job-id] [--all] [--json]",
       "  copilot-companion result [job-id] [--json]",
@@ -10217,7 +10308,9 @@ async function main() {
         allowShell: flags["allow-shell"] === true,
         allowUrl: flags["allow-url"] === true,
         minQuota: flagNumber2(flags, "min-quota"),
-        writePath: flagString2(flags, "write")
+        writePath: flagString2(flags, "write"),
+        context: flagString2(flags, "context"),
+        instructionsPath: flagString2(flags, "instructions")
       });
       break;
     }
@@ -10240,7 +10333,9 @@ async function main() {
         reasoning,
         timeout: flagNumber2(flags, "timeout"),
         minQuota: flagNumber2(flags, "min-quota"),
-        fix: flags["fix"] === true
+        fix: flags["fix"] === true,
+        context: flagString2(flags, "context"),
+        instructionsPath: flagString2(flags, "instructions")
       });
       break;
     }
@@ -10254,7 +10349,9 @@ async function main() {
         minQuota: flagNumber2(flags, "min-quota"),
         allowShell: flags["allow-shell"] === true,
         allowUrl: flags["allow-url"] === true,
-        writePath: flagString2(flags, "write")
+        writePath: flagString2(flags, "write"),
+        context: flagString2(flags, "context"),
+        instructionsPath: flagString2(flags, "instructions")
       });
       break;
     }
