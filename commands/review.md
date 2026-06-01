@@ -17,7 +17,7 @@ Core constraint:
 
 Mode selection:
 - Default mode is a focused defect review (`gpt-5.3-codex`, medium effort).
-- `--adversarial` switches to a design-challenge review (`gpt-5.4`, high effort) that questions the approach, not just the implementation.
+- `--adversarial` switches to a design-challenge review (`gpt-5.5`, high effort) that questions the approach, not just the implementation.
 - `--model` and `--reasoning` override the defaults.
 
 Execution mode rules:

@@ -9,7 +9,7 @@ node "${CLAUDE_PLUGIN_ROOT}/dist/copilot-companion.cjs" implement $ARGUMENTS
 ```
 
 Supports:
-- `--model <id>` — override the default `claude-opus-4.6`
+- `--model <id>` — override the default `claude-opus-4.8`
 - `--reasoning <low|medium|high>` — reasoning effort
 - `--no-worktree` — run in the current working directory instead of an isolated branch (dangerous)
 - `--allow-shell` — permit Copilot to run shell commands inside the worktree (needed for tests/builds)

@@ -35,17 +35,21 @@ Unlike the Gemini plugin, this plugin does **not** own the agent loop. `@github/
 
 ### SDK event → output mapping (`src/lib/event-stream.ts`)
 
-- `assistant.usage.quotaSnapshots` → persisted to `{stateDir}/quota.json` (live quota telemetry)
+- `assistant.usage` → no longer carries quota (as of SDK 1.0). It reports a per-call `cost` (the model's premium-request multiplier), which we log for visibility. Quota is fetched **actively** via `client.rpc.account.getQuota({})` (see `fetchQuota` in `src/lib/quota.ts`), persisted to `{stateDir}/quota.json`.
 - `session.idle` → **primary completion signal** — fires when the session finishes processing the prompt (all tool calls done, final response emitted). This is what `sendAndWait` uses internally.
 - `session.task_complete` → **optional summary enrichment** — carries the agent's structured `summary` if emitted, but NOT all tasks emit this event. We capture it but do not block on it.
-- `session.shutdown` → captures `totalPremiumRequests`, `codeChanges`
+- `session.shutdown` → captures `codeChanges` and sums per-model `requests.cost` into `premiumRequestCost` (a fallback for `session.rpc.usage.getMetrics().totalPremiumRequestCost`, which we query while the session is still alive)
 - `session.error` → rejects the completion promise
 - `permission.requested` → logged (decisions are made in `src/lib/permission.ts`, not here)
+
+### Billing model (Copilot multiplier-based premium requests)
+
+Premium usage is metered as a **cost** with per-model multipliers, so usage/entitlement/remaining numbers may be **fractional** (e.g. one Opus call can cost more than 1). The plugin reports `premiumRequestCost` (not an integer request count). `quota.ts` formats fractional numbers via `fmtNum` and surfaces `overage` (usage billed beyond the entitlement) when present.
 
 ### Stdout envelope
 
 The `implement` command always emits a single JSON line on stdout, parseable by the `copilot-rescue` subagent:
-- `{"status":"completed", branch, summary, filesModified, linesAdded, linesRemoved, premiumRequests, model, quotaRemaining}`
+- `{"status":"completed", branch, summary, filesModified, linesAdded, linesRemoved, premiumRequestCost, model, quotaRemaining}`
 - `{"status":"queued", jobId}` (from `--background`)
 - `{"status":"blocked", reason, resetAt, remaining, message}` (quota gate)
 - `{"status":"failed", jobId, error, branch?}`
@@ -73,6 +77,6 @@ Ported from the reference plugin. `{stateDir}` is `$CLAUDE_PLUGIN_DATA/state/<sl
 
 - **Envelope shape is a hard contract** with the `copilot-rescue` subagent. Do not add/remove top-level fields without updating both sides.
 - **`sendAndWait` is NOT used** — we wire event listeners manually so we can capture quota, permission, and tool events alongside the completion signal (`session.idle`).
-- **Default model** is `claude-opus-4.6`; confirmed present at `setup` time but not enforced. If unavailable, the user is told to pass `--model`.
+- **Default model** is `claude-opus-4.8`; confirmed present at `setup` time but not enforced. If unavailable, the user is told to pass `--model`.
 - **`approveAll` is not used** from the SDK. Our selective handler is the safety boundary that makes proactive orchestrator delegation safe.
 - **Dependencies**: `@github/copilot-sdk` only. No Google libs, no custom HTTP. CJS output (`"type": "module"` in package.json, `.cjs` output).

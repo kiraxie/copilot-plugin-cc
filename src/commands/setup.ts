@@ -6,12 +6,12 @@ import { CopilotClient } from '@github/copilot-sdk';
 import type { ModelInfo } from '@github/copilot-sdk';
 
 import { checkAuth } from '../lib/copilot-auth.js';
-import { readSnapshot, summarize, renderQuotaBar } from '../lib/quota.js';
+import { readSnapshot, summarize, renderQuotaBar, fetchQuota } from '../lib/quota.js';
 import { pruneOrphans } from '../lib/worktree.js';
 import { resolveStateDir } from '../lib/state.js';
 import { CLIENT_NAME, PLUGIN_VERSION } from '../lib/version.js';
 
-const DEFAULT_MODEL = 'claude-opus-4.6';
+const DEFAULT_MODEL = 'claude-opus-4.8';
 
 export interface SetupOptions {
   check?: boolean;
@@ -37,7 +37,7 @@ export async function runSetup(options: SetupOptions = {}): Promise<void> {
   const stateDir = resolveStateDir(cwd);
   const isCheck = options.check === true;
 
-  const client = new CopilotClient({ cwd });
+  const client = new CopilotClient({ workingDirectory: cwd });
 
   try {
     await client.start();
@@ -90,6 +90,10 @@ export async function runSetup(options: SetupOptions = {}): Promise<void> {
   const defaultAvailable = modelIds.includes(DEFAULT_MODEL);
 
   const pruneReport = pruneOrphans(cwd);
+
+  // Actively refresh the quota snapshot while the client is live — the SDK no
+  // longer pushes quota via events, so this is how `setup` shows real numbers.
+  await fetchQuota(client, stateDir).catch(() => null);
 
   await client.stop().catch(() => { /* ignore */ });
 

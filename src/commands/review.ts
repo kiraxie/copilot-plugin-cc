@@ -10,7 +10,7 @@
 import { CopilotClient } from '@github/copilot-sdk';
 
 import { resolveStateDir, generateJobId, appendLog, jobLogPath } from '../lib/state.js';
-import { readSnapshot, evaluateGate, summarize, isPremiumModel } from '../lib/quota.js';
+import { readSnapshot, evaluateGate, summarize, isPremiumModel, fetchQuota, fmtNum } from '../lib/quota.js';
 import { checkAuth } from '../lib/copilot-auth.js';
 import { makePermissionHandler } from '../lib/permission.js';
 import { attachStream } from '../lib/event-stream.js';
@@ -33,7 +33,7 @@ export interface ReviewOptions {
 
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000;
 const DEFAULT_MODEL_STANDARD = 'gpt-5.3-codex';
-const DEFAULT_MODEL_ADVERSARIAL = 'gpt-5.4';
+const DEFAULT_MODEL_ADVERSARIAL = 'gpt-5.5';
 const DEFAULT_EFFORT_STANDARD: ReasoningEffort = 'xhigh';
 const DEFAULT_EFFORT_ADVERSARIAL: ReasoningEffort = 'xhigh';
 
@@ -90,7 +90,7 @@ export async function runReview(cwd: string, options: ReviewOptions = {}): Promi
   log(`prompt built: ${prompt.length} chars`);
 
   // 4. Copilot client (read-only) --------------------------------------------
-  const client = new CopilotClient({ cwd: context.repoRoot, env: process.env });
+  const client = new CopilotClient({ workingDirectory: context.repoRoot, env: process.env });
   let cleanupDone = false;
   let aborted = false;
 
@@ -167,6 +167,7 @@ export async function runReview(cwd: string, options: ReviewOptions = {}): Promi
   //    must release the session, stream listeners, and the Copilot client.
   let completionResult: Awaited<typeof stream.completion> | null = null;
   let shutdownResult: Awaited<typeof stream.shutdown> | null = null;
+  let premiumRequestCost: number | undefined;
   let timedOut = false;
   let sessionTorn = false;
   const timeoutHandle = setTimeout(() => {
@@ -182,6 +183,8 @@ export async function runReview(cwd: string, options: ReviewOptions = {}): Promi
     clearTimeout(timeoutHandle);
     await session.disconnect().catch((e) => log(`disconnect warn: ${(e as Error).message}`));
     stream.dispose();
+    // Refresh quota while the client is still live (SDK no longer pushes it).
+    await fetchQuota(client, stateDir).catch(() => null);
     await client.stop().catch((e) => log(`client.stop warn: ${(e as Error).message}`));
   };
 
@@ -189,7 +192,14 @@ export async function runReview(cwd: string, options: ReviewOptions = {}): Promi
     progress(`Sending ${kind} review prompt to Copilot (model=${model}, effort=${reasoning})…`);
     await session.send({ prompt });
     completionResult = await stream.completion;
-    progress('Review complete; collecting shutdown metrics.');
+    progress('Review complete; collecting usage metrics.');
+    // Premium cost via session usage metrics while the session is alive.
+    try {
+      const metrics = await session.rpc.usage.getMetrics();
+      premiumRequestCost = metrics.totalPremiumRequestCost;
+    } catch (e) {
+      log(`usage.getMetrics failed: ${(e as Error).message}`);
+    }
     // Disconnect before waiting for shutdown so the SDK flushes its final event.
     await session.disconnect().catch((e) => log(`disconnect warn: ${(e as Error).message}`));
     shutdownResult = await Promise.race([
@@ -228,7 +238,7 @@ export async function runReview(cwd: string, options: ReviewOptions = {}): Promi
   }
 
   const quotaRemaining = summarize(readSnapshot(stateDir));
-  const premium = shutdownResult?.totalPremiumRequests ?? 0;
+  const premium = premiumRequestCost ?? shutdownResult?.premiumRequestCost ?? 0;
   const usedModel = shutdownResult?.currentModel ?? model;
 
   // Stdout is Copilot's markdown verbatim — slash-command consumers and
@@ -245,12 +255,12 @@ export async function runReview(cwd: string, options: ReviewOptions = {}): Promi
         .map((p) =>
           p.unlimited
             ? `${p.label}=unlimited`
-            : `${p.label}=${p.remaining}/${p.total}`,
+            : `${p.label}=${fmtNum(p.remaining ?? 0)}/${fmtNum(p.total ?? 0)}`,
         )
         .join(', ')
     : 'no quota snapshot yet';
   progress(
-    `Review done — kind=${kind} model=${usedModel} effort=${reasoning} files=${context.fileCount} premium-used=${premium} | ${poolNote}`,
+    `Review done — kind=${kind} model=${usedModel} effort=${reasoning} files=${context.fileCount} premium-cost=${fmtNum(premium)} | ${poolNote}`,
   );
   log(`review done: kind=${kind} files=${context.fileCount} premium=${premium} pools=${poolNote}`);
   progress(`Job log: ${jobLogPath(stateDir, jobId)}`);

@@ -31,7 +31,7 @@ claude plugin install copilot@copilot-plugin-cc
 
 ### `implement` flags
 
-- `--model <id>` — override the default `claude-opus-4.6`
+- `--model <id>` — override the default `claude-opus-4.8`
 - `--reasoning <low|medium|high>` — reasoning effort
 - `--no-worktree` — run in the main working directory (dangerous)
 - `--allow-shell` — permit Copilot to run shell commands (needed for tests/builds/installs)
@@ -42,10 +42,10 @@ claude plugin install copilot@copilot-plugin-cc
 
 ## How it works
 
-1. **Quota gate** — The plugin reads cached `assistant.usage.quotaSnapshots` (captured from prior Copilot sessions). If premium requests are exhausted, it emits a `{"status":"blocked"}` envelope without opening a session.
+1. **Quota gate** — The plugin reads a cached quota snapshot (fetched from the SDK's `account.getQuota` on prior runs). If premium requests are exhausted, it emits a `{"status":"blocked"}` envelope without opening a session. Premium usage is metered as a multiplier-based **cost**, so numbers may be fractional.
 2. **Worktree sandbox** — Creates `copilot/<jobId>` branch in an isolated worktree checkout. HEAD is copied from the main cwd's HEAD; uncommitted changes are **not** carried over (you get a warning).
 3. **Selective permissions** — Auto-approves file reads and writes within the worktree. Shell/URL access is **denied by default** and requires `--allow-shell` / `--allow-url`. Every permission request is logged.
-4. **Structured output** — On success, emits a JSON envelope with `branch`, `summary`, `filesModified`, `linesAdded`, `linesRemoved`, `premiumRequests`, and `quotaRemaining`. The main Claude Code thread reviews and decides whether to merge.
+4. **Structured output** — On success, emits a JSON envelope with `branch`, `summary`, `filesModified`, `linesAdded`, `linesRemoved`, `premiumRequestCost`, and `quotaRemaining`. The main Claude Code thread reviews and decides whether to merge.
 
 ## Proactive delegation
 

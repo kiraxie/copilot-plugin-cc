@@ -5,6 +5,8 @@
  * The envelope shape is produced by src/commands/implement.ts.
  */
 
+import { fmtNum } from './quota.js';
+
 export interface CompletedEnvelope {
   status: 'completed';
   branch: string;
@@ -12,7 +14,7 @@ export interface CompletedEnvelope {
   filesModified: string[];
   linesAdded: number;
   linesRemoved: number;
-  premiumRequests: number;
+  premiumRequestCost: number;
   model: string;
   quotaRemaining?: {
     premium?: number;
@@ -75,11 +77,11 @@ function renderCompleted(env: CompletedEnvelope): string {
   lines.push('');
   lines.push(`**Branch:** \`${env.branch}\``);
   lines.push(`**Model:** ${env.model}`);
-  lines.push(`**Premium requests used:** ${env.premiumRequests}`);
+  lines.push(`**Premium request cost:** ${fmtNum(env.premiumRequestCost)}`);
   if (env.quotaRemaining) {
     const q = env.quotaRemaining;
     const parts: string[] = [];
-    if (typeof q.premium === 'number') parts.push(`${q.premium} remaining`);
+    if (typeof q.premium === 'number') parts.push(`${fmtNum(q.premium)} remaining`);
     if (typeof q.percentage === 'number') parts.push(`${q.percentage.toFixed(1)}%`);
     if (q.resetAt) parts.push(`resets ${q.resetAt}`);
     if (parts.length > 0) lines.push(`**Quota:** ${parts.join(' · ')}`);

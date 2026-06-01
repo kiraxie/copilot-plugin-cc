@@ -1,9 +1,15 @@
 /**
  * Quota snapshot cache + gate evaluation.
  *
- * The Copilot SDK emits `assistant.usage` events carrying live
- * `quotaSnapshots`. We persist the most recent view so the `implement` command
- * can refuse work before opening a session when quota is exhausted.
+ * Quota is fetched actively via the SDK's `account.getQuota` RPC (the
+ * `assistant.usage` event no longer carries `quotaSnapshots` as of SDK 1.0).
+ * Callers fetch a fresh snapshot and hand the loosely-typed `quotaSnapshots`
+ * record to `recordSnapshot`; we persist the most recent view so the
+ * `implement` command can refuse work before opening a session when quota is
+ * exhausted.
+ *
+ * Billing note: premium usage is metered as a *cost* with per-model
+ * multipliers, so `usedRequests` / `entitlementRequests` may be fractional.
  */
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -16,6 +22,10 @@ export interface QuotaEntry {
   resetDate: string;
   isUnlimitedEntitlement: boolean;
   usageAllowedWithExhaustedQuota: boolean;
+  /** Additional usage made this period beyond the entitlement (overage). */
+  overage: number;
+  /** Whether overage is permitted once the entitlement is exhausted. */
+  overageAllowedWithExhaustedQuota: boolean;
 }
 
 export interface QuotaSnapshot {
@@ -45,7 +55,7 @@ export function readSnapshot(stateDir: string): QuotaSnapshot | null {
  */
 export function recordSnapshot(
   stateDir: string,
-  quotas: Record<string, Partial<QuotaEntry>>,
+  quotas: Record<string, Partial<QuotaEntry> | undefined>,
 ): QuotaSnapshot {
   const existing = readSnapshot(stateDir);
   const merged: QuotaSnapshot = {
@@ -61,11 +71,45 @@ export function recordSnapshot(
       resetDate: entry.resetDate ?? '',
       isUnlimitedEntitlement: entry.isUnlimitedEntitlement ?? false,
       usageAllowedWithExhaustedQuota: entry.usageAllowedWithExhaustedQuota ?? false,
+      overage: entry.overage ?? 0,
+      overageAllowedWithExhaustedQuota: entry.overageAllowedWithExhaustedQuota ?? false,
     };
   }
   mkdirSync(dirname(snapshotPath(stateDir)), { recursive: true });
   writeFileSync(snapshotPath(stateDir), JSON.stringify(merged, null, 2), 'utf-8');
   return merged;
+}
+
+/**
+ * Minimal structural view of the SDK client needed to query quota. Kept
+ * loosely typed so this module does not hard-depend on the SDK's exact shape.
+ */
+export interface QuotaQueryable {
+  rpc: {
+    account: {
+      getQuota: (params: Record<string, never>) => Promise<{
+        quotaSnapshots: Record<string, Partial<QuotaEntry> | undefined>;
+      }>;
+    };
+  };
+}
+
+/**
+ * Actively fetch a fresh quota snapshot via `account.getQuota` and persist it.
+ * Returns the merged snapshot, or `null` if the RPC fails (callers fall back to
+ * the cached snapshot). The SDK no longer pushes quota via `assistant.usage`,
+ * so this is the only way to learn live quota.
+ */
+export async function fetchQuota(
+  client: QuotaQueryable,
+  stateDir: string,
+): Promise<QuotaSnapshot | null> {
+  try {
+    const result = await client.rpc.account.getQuota({});
+    return recordSnapshot(stateDir, result.quotaSnapshots ?? {});
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -162,11 +206,13 @@ export interface PoolView {
   id: string;
   label: string;
   unlimited: boolean;
-  /** Metered pools only — undefined when unlimited. */
+  /** Metered pools only — undefined when unlimited. May be fractional. */
   used?: number;
   total?: number;
   remaining?: number;
   remainingPercentage?: number;
+  /** Usage beyond the entitlement this period, if any. May be fractional. */
+  overage?: number;
   resetAt?: string;
 }
 
@@ -221,6 +267,7 @@ export function summarize(snapshot: QuotaSnapshot | null): QuotaSummary {
       total: q.entitlementRequests,
       remaining,
       remainingPercentage: q.remainingPercentage,
+      overage: q.overage || undefined,
       resetAt: q.resetDate || undefined,
     };
   });
@@ -252,6 +299,14 @@ export function summarize(snapshot: QuotaSnapshot | null): QuotaSummary {
     percentage: minPct,
     resetAt: tightestReset || undefined,
   };
+}
+
+/**
+ * Format a possibly-fractional quota number: integers stay clean, fractional
+ * costs (from per-model multipliers) show up to 2 trimmed decimals.
+ */
+export function fmtNum(n: number): string {
+  return Number.isInteger(n) ? String(n) : parseFloat(n.toFixed(2)).toString();
 }
 
 const BAR_WIDTH = 30;
@@ -296,11 +351,14 @@ export function renderQuotaBar(
   for (const p of metered) {
     const remainingPct = p.remainingPercentage ?? 0;
     const usedPct = 100 - remainingPct;
-    const total = p.total ?? '?';
-    const remaining = p.remaining ?? 0;
+    const total = p.total === undefined ? '?' : fmtNum(p.total);
+    const remaining = fmtNum(p.remaining ?? 0);
     lines.push(`${p.label}`);
     lines.push(`  Usage      ${renderBar(usedPct)}  ${usedPct.toFixed(1)}%`);
     lines.push(`  Remaining  ${remaining} / ${total}`);
+    if (p.overage && p.overage > 0) {
+      lines.push(`  Overage    ${fmtNum(p.overage)} (billed beyond entitlement)`);
+    }
     if (p.resetAt) {
       const days = daysUntil(p.resetAt);
       const suffix = days === null ? '' : days === 0 ? '  (resets today)' : `  (in ~${days} days)`;

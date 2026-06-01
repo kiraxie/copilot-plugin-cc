@@ -16,7 +16,7 @@ node "${CLAUDE_PLUGIN_ROOT}/dist/copilot-companion.cjs" implement "<task>" [flag
 
 Flags:
 
-- `--model <id>` — default `claude-opus-4.6`
+- `--model <id>` — default `claude-opus-4.8`
 - `--reasoning <low|medium|high>` — reasoning effort
 - `--no-worktree` — dangerous; do not pass unless the user explicitly asked
 - `--allow-shell` — required for any task that will run tests / builds / installs

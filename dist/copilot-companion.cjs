@@ -70,28 +70,28 @@ var require_messages = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.Message = exports2.NotificationType9 = exports2.NotificationType8 = exports2.NotificationType7 = exports2.NotificationType6 = exports2.NotificationType5 = exports2.NotificationType4 = exports2.NotificationType3 = exports2.NotificationType2 = exports2.NotificationType1 = exports2.NotificationType0 = exports2.NotificationType = exports2.RequestType9 = exports2.RequestType8 = exports2.RequestType7 = exports2.RequestType6 = exports2.RequestType5 = exports2.RequestType4 = exports2.RequestType3 = exports2.RequestType2 = exports2.RequestType1 = exports2.RequestType = exports2.RequestType0 = exports2.AbstractMessageSignature = exports2.ParameterStructures = exports2.ResponseError = exports2.ErrorCodes = void 0;
     var is = require_is();
-    var ErrorCodes;
-    (function(ErrorCodes2) {
-      ErrorCodes2.ParseError = -32700;
-      ErrorCodes2.InvalidRequest = -32600;
-      ErrorCodes2.MethodNotFound = -32601;
-      ErrorCodes2.InvalidParams = -32602;
-      ErrorCodes2.InternalError = -32603;
-      ErrorCodes2.jsonrpcReservedErrorRangeStart = -32099;
-      ErrorCodes2.serverErrorStart = -32099;
-      ErrorCodes2.MessageWriteError = -32099;
-      ErrorCodes2.MessageReadError = -32098;
-      ErrorCodes2.PendingResponseRejected = -32097;
-      ErrorCodes2.ConnectionInactive = -32096;
-      ErrorCodes2.ServerNotInitialized = -32002;
-      ErrorCodes2.UnknownErrorCode = -32001;
-      ErrorCodes2.jsonrpcReservedErrorRangeEnd = -32e3;
-      ErrorCodes2.serverErrorEnd = -32e3;
-    })(ErrorCodes || (exports2.ErrorCodes = ErrorCodes = {}));
-    var ResponseError2 = class _ResponseError extends Error {
+    var ErrorCodes3;
+    (function(ErrorCodes4) {
+      ErrorCodes4.ParseError = -32700;
+      ErrorCodes4.InvalidRequest = -32600;
+      ErrorCodes4.MethodNotFound = -32601;
+      ErrorCodes4.InvalidParams = -32602;
+      ErrorCodes4.InternalError = -32603;
+      ErrorCodes4.jsonrpcReservedErrorRangeStart = -32099;
+      ErrorCodes4.serverErrorStart = -32099;
+      ErrorCodes4.MessageWriteError = -32099;
+      ErrorCodes4.MessageReadError = -32098;
+      ErrorCodes4.PendingResponseRejected = -32097;
+      ErrorCodes4.ConnectionInactive = -32096;
+      ErrorCodes4.ServerNotInitialized = -32002;
+      ErrorCodes4.UnknownErrorCode = -32001;
+      ErrorCodes4.jsonrpcReservedErrorRangeEnd = -32e3;
+      ErrorCodes4.serverErrorEnd = -32e3;
+    })(ErrorCodes3 || (exports2.ErrorCodes = ErrorCodes3 = {}));
+    var ResponseError3 = class _ResponseError extends Error {
       constructor(code, message, data) {
         super(message);
-        this.code = is.number(code) ? code : ErrorCodes.UnknownErrorCode;
+        this.code = is.number(code) ? code : ErrorCodes3.UnknownErrorCode;
         this.data = data;
         Object.setPrototypeOf(this, _ResponseError.prototype);
       }
@@ -106,7 +106,7 @@ var require_messages = __commonJS({
         return result;
       }
     };
-    exports2.ResponseError = ResponseError2;
+    exports2.ResponseError = ResponseError3;
     var ParameterStructures = class _ParameterStructures {
       constructor(kind) {
         this.kind = kind;
@@ -3298,112 +3298,1407 @@ var import_node2 = __toESM(require_node(), 1);
 // node_modules/@github/copilot-sdk/dist/generated/rpc.js
 function createServerRpc(connection) {
   return {
+    /**
+     * Checks server responsiveness and returns protocol information.
+     *
+     * @param params Optional message to echo back to the caller.
+     *
+     * @returns Server liveness response, including the echoed message, current server timestamp, and protocol version.
+     */
     ping: async (params) => connection.sendRequest("ping", params),
     models: {
-      list: async () => connection.sendRequest("models.list", {})
+      /**
+       * Lists Copilot models available to the authenticated user.
+       *
+       * @param params Optional GitHub token used to list models for a specific user instead of the global auth context.
+       *
+       * @returns List of Copilot models available to the resolved user, including capabilities and billing metadata.
+       */
+      list: async (params) => connection.sendRequest("models.list", params)
     },
     tools: {
+      /**
+       * Lists built-in tools available for a model.
+       *
+       * @param params Optional model identifier whose tool overrides should be applied to the listing.
+       *
+       * @returns Built-in tools available for the requested model, with their parameters and instructions.
+       */
       list: async (params) => connection.sendRequest("tools.list", params)
     },
     account: {
-      getQuota: async () => connection.sendRequest("account.getQuota", {})
+      /**
+       * Gets Copilot quota usage for the authenticated user or supplied GitHub token.
+       *
+       * @param params Optional GitHub token used to look up quota for a specific user instead of the global auth context.
+       *
+       * @returns Quota usage snapshots for the resolved user, keyed by quota type.
+       */
+      getQuota: async (params) => connection.sendRequest("account.getQuota", params)
+    },
+    secrets: {
+      /**
+       * Registers secret values for redaction in session logs and exports. The SDK calls this to inject dynamically generated secret values (e.g., OIDC tokens).
+       *
+       * @param params Secret values to add to the redaction filter.
+       *
+       * @returns Confirmation that the secret values were registered.
+       */
+      addFilterValues: async (params) => connection.sendRequest("secrets.addFilterValues", params)
     },
     mcp: {
       config: {
+        /**
+         * Lists MCP servers from user configuration.
+         *
+         * @returns User-configured MCP servers, keyed by server name.
+         */
         list: async () => connection.sendRequest("mcp.config.list", {}),
+        /**
+         * Adds an MCP server to user configuration.
+         *
+         * @param params MCP server name and configuration to add to user configuration.
+         */
         add: async (params) => connection.sendRequest("mcp.config.add", params),
+        /**
+         * Updates an MCP server in user configuration.
+         *
+         * @param params MCP server name and replacement configuration to write to user configuration.
+         */
         update: async (params) => connection.sendRequest("mcp.config.update", params),
-        remove: async (params) => connection.sendRequest("mcp.config.remove", params)
-      }
+        /**
+         * Removes an MCP server from user configuration.
+         *
+         * @param params MCP server name to remove from user configuration.
+         */
+        remove: async (params) => connection.sendRequest("mcp.config.remove", params),
+        /**
+         * Enables MCP servers in user configuration for new sessions.
+         *
+         * @param params MCP server names to enable for new sessions.
+         */
+        enable: async (params) => connection.sendRequest("mcp.config.enable", params),
+        /**
+         * Disables MCP servers in user configuration for new sessions.
+         *
+         * @param params MCP server names to disable for new sessions.
+         */
+        disable: async (params) => connection.sendRequest("mcp.config.disable", params)
+      },
+      /**
+       * Discovers MCP servers from user, workspace, plugin, and builtin sources.
+       *
+       * @param params Optional working directory used as context for MCP server discovery.
+       *
+       * @returns MCP servers discovered from user, workspace, plugin, and built-in sources.
+       */
+      discover: async (params) => connection.sendRequest("mcp.discover", params)
+    },
+    skills: {
+      config: {
+        /**
+         * Replaces the global list of disabled skills.
+         *
+         * @param params Skill names to mark as disabled in global configuration, replacing any previous list.
+         */
+        setDisabledSkills: async (params) => connection.sendRequest("skills.config.setDisabledSkills", params)
+      },
+      /**
+       * Discovers skills across global and project sources.
+       *
+       * @param params Optional project paths and additional skill directories to include in discovery.
+       *
+       * @returns Skills discovered across global and project sources.
+       */
+      discover: async (params) => connection.sendRequest("skills.discover", params)
     },
     sessionFs: {
+      /**
+       * Registers an SDK client as the session filesystem provider.
+       *
+       * @param params Initial working directory, session-state path layout, and path conventions used to register the calling SDK client as the session filesystem provider.
+       *
+       * @returns Indicates whether the calling client was registered as the session filesystem provider.
+       */
       setProvider: async (params) => connection.sendRequest("sessionFs.setProvider", params)
     },
     /** @experimental */
     sessions: {
-      fork: async (params) => connection.sendRequest("sessions.fork", params)
+      /**
+       * Creates a new session by forking persisted history from an existing session.
+       *
+       * @param params Source session identifier to fork from, optional event-ID boundary, and optional friendly name for the new session.
+       *
+       * @returns Identifier and optional friendly name assigned to the newly forked session.
+       */
+      fork: async (params) => connection.sendRequest("sessions.fork", params),
+      /**
+       * Connects to an existing remote session and exposes it as an SDK session.
+       *
+       * @param params Remote session connection parameters.
+       *
+       * @returns Remote session connection result.
+       */
+      connect: async (params) => connection.sendRequest("sessions.connect", params),
+      /**
+       * Lists persisted sessions, optionally filtered by working-directory context.
+       *
+       * @param params Optional metadata-load limit and filters applied to the returned sessions.
+       *
+       * @returns Persisted sessions matching the filter, ordered most-recently-modified first.
+       */
+      list: async (params) => connection.sendRequest("sessions.list", params),
+      /**
+       * Finds the local session bound to a GitHub task ID, if any.
+       *
+       * @param params GitHub task ID to look up.
+       *
+       * @returns ID of the local session bound to the given GitHub task, or omitted when none.
+       */
+      findByTaskId: async (params) => connection.sendRequest("sessions.findByTaskId", params),
+      /**
+       * Resolves a UUID prefix to a unique session ID, if exactly one session matches.
+       *
+       * @param params UUID prefix to resolve to a unique session ID.
+       *
+       * @returns Session ID matching the prefix, omitted when no unique match exists.
+       */
+      findByPrefix: async (params) => connection.sendRequest("sessions.findByPrefix", params),
+      /**
+       * Returns the most-relevant prior session for a given working-directory context.
+       *
+       * @param params Optional working-directory context used to score session relevance.
+       *
+       * @returns Most-relevant session ID for the supplied context, or omitted when no sessions exist.
+       */
+      getLastForContext: async (params) => connection.sendRequest("sessions.getLastForContext", params),
+      /**
+       * Computes the absolute path to a session's persisted events.jsonl file.
+       *
+       * @param params Session ID whose event-log file path to compute.
+       *
+       * @returns Absolute path to the session's events.jsonl file on disk.
+       */
+      getEventFilePath: async (params) => connection.sendRequest("sessions.getEventFilePath", params),
+      /**
+       * Returns the on-disk byte size of each session's workspace directory.
+       *
+       * @returns Map of sessionId -> on-disk size in bytes for each session's workspace directory.
+       */
+      getSizes: async () => connection.sendRequest("sessions.getSizes", {}),
+      /**
+       * Returns the subset of the supplied session IDs that are currently held by another running process.
+       *
+       * @param params Session IDs to test for live in-use locks.
+       *
+       * @returns Session IDs from the input set that are currently in use by another process.
+       */
+      checkInUse: async (params) => connection.sendRequest("sessions.checkInUse", params),
+      /**
+       * Returns a session's persisted remote-steerable flag, if any has been recorded.
+       *
+       * @param params Session ID to look up the persisted remote-steerable flag for.
+       *
+       * @returns The session's persisted remote-steerable flag, or omitted when no value has been persisted.
+       */
+      getPersistedRemoteSteerable: async (params) => connection.sendRequest("sessions.getPersistedRemoteSteerable", params),
+      /**
+       * Closes a session: emits shutdown, flushes pending events, releases the in-use lock, and disposes the active session.
+       *
+       * @param params Session ID to close.
+       *
+       * @returns Closes a session: emits shutdown, flushes pending events to disk, releases the in-use lock, disposes the active session. Idempotent: succeeds even if the session is not currently active.
+       */
+      close: async (params) => connection.sendRequest("sessions.close", params),
+      /**
+       * Closes, deactivates, and deletes a set of sessions, returning the bytes freed per session.
+       *
+       * @param params Session IDs to close, deactivate, and delete from disk.
+       *
+       * @returns Map of sessionId -> bytes freed by removing the session's workspace directory.
+       */
+      bulkDelete: async (params) => connection.sendRequest("sessions.bulkDelete", params),
+      /**
+       * Deletes sessions older than the given threshold, with optional dry-run and exclusion list.
+       *
+       * @param params Age threshold and optional flags controlling which old sessions are pruned (or simulated when dryRun is true).
+       *
+       * @returns Outcome of the prune operation: deleted IDs, dry-run candidates, skipped IDs, total bytes freed, and the dry-run flag.
+       */
+      pruneOld: async (params) => connection.sendRequest("sessions.pruneOld", params),
+      /**
+       * Flushes a session's pending events to disk.
+       *
+       * @param params Session ID whose pending events should be flushed to disk.
+       *
+       * @returns Flush a session's pending events to disk. No-op when no writer exists for the session (e.g., already closed).
+       */
+      save: async (params) => connection.sendRequest("sessions.save", params),
+      /**
+       * Releases the in-use lock held by this process for a session.
+       *
+       * @param params Session ID whose in-use lock should be released.
+       *
+       * @returns Release the in-use lock held by this process for the given session. No-op when this process does not currently hold a lock for the session.
+       */
+      releaseLock: async (params) => connection.sendRequest("sessions.releaseLock", params),
+      /**
+       * Backfills missing summary and context fields on the supplied session metadata records.
+       *
+       * @param params Session metadata records to enrich with summary and context information.
+       *
+       * @returns The enriched metadata records, with summary and context fields backfilled where available. Sessions confirmed empty and unnamed are omitted.
+       */
+      enrichMetadata: async (params) => connection.sendRequest("sessions.enrichMetadata", params),
+      /**
+       * Reloads user, plugin, and (optionally) repo hooks on the active session.
+       *
+       * @param params Active session ID and an optional flag for deferring repo-level hooks until folder trust.
+       *
+       * @returns Reload all hooks (user, plugin, optionally repo) and apply them to the active session. Call after installing or removing plugins so their hooks take effect immediately. No-op when no active session matches the given sessionId.
+       */
+      reloadPluginHooks: async (params) => connection.sendRequest("sessions.reloadPluginHooks", params),
+      /**
+       * Loads previously-deferred repo-level hooks on the active session, returning queued startup prompts.
+       *
+       * @param params Active session ID whose deferred repo-level hooks should be loaded.
+       *
+       * @returns Queued repo-level startup prompts and the total hook command count after loading.
+       */
+      loadDeferredRepoHooks: async (params) => connection.sendRequest("sessions.loadDeferredRepoHooks", params),
+      /**
+       * Replaces the manager-wide additional plugins registered with the session manager.
+       *
+       * @param params Manager-wide additional plugins to register; replaces any previously-configured set.
+       *
+       * @returns Replace the manager-wide additional plugins. New session creations and subsequent hook reloads see the new set; already-running sessions keep their existing hook installation until the next reload.
+       */
+      setAdditionalPlugins: async (params) => connection.sendRequest("sessions.setAdditionalPlugins", params)
+    },
+    /** @experimental */
+    agentRegistry: {
+      /**
+       * Spawns a managed-server child with the supplied configuration and returns a discriminated-union result. The caller (typically the CLI controller) is responsible for attaching to the spawned child and sending any follow-up prompt. When the controller-local spawn gate is closed the server returns JSON-RPC MethodNotFound.
+       *
+       * @param params Inputs to spawn a managed-server child via the controller's spawn delegate.
+       *
+       * @returns Outcome of an agentRegistry.spawn call.
+       */
+      spawn: async (params) => connection.sendRequest("agentRegistry.spawn", params)
     }
+  };
+}
+function createInternalServerRpc(connection) {
+  return {
+    /**
+     * Performs the SDK server connection handshake and validates the optional connection token.
+     *
+     * @param params Optional connection token presented by the SDK client during the handshake.
+     *
+     * @returns Handshake result reporting the server's protocol version and package version on success.
+     */
+    connect: async (params) => connection.sendRequest("connect", params)
   };
 }
 function createSessionRpc(connection, sessionId) {
   return {
-    model: {
-      getCurrent: async () => connection.sendRequest("session.model.getCurrent", { sessionId }),
-      switchTo: async (params) => connection.sendRequest("session.model.switchTo", { sessionId, ...params })
+    /**
+     * Suspends the session while preserving persisted state for later resume.
+     *
+     * @experimental
+     */
+    suspend: async () => connection.sendRequest("session.suspend", { sessionId }),
+    /**
+     * Sends a user message to the session and returns its message ID.
+     *
+     * @param params Parameters for sending a user message to the session
+     *
+     * @returns Result of sending a user message
+     *
+     * @experimental
+     */
+    send: async (params) => connection.sendRequest("session.send", { sessionId, ...params }),
+    /**
+     * Aborts the current agent turn.
+     *
+     * @param params Parameters for aborting the current turn
+     *
+     * @returns Result of aborting the current turn
+     *
+     * @experimental
+     */
+    abort: async (params) => connection.sendRequest("session.abort", { sessionId, ...params }),
+    /**
+     * Shuts down the session and persists its final state. Awaits any deferred sessionEnd hooks before resolving so user-supplied hook scripts complete before the runtime tears down.
+     *
+     * @param params Parameters for shutting down the session
+     *
+     * @experimental
+     */
+    shutdown: async (params) => connection.sendRequest("session.shutdown", { sessionId, ...params }),
+    /** @experimental */
+    auth: {
+      /**
+       * Gets authentication status and account metadata for the session.
+       *
+       * @returns Authentication status and account metadata for the session.
+       */
+      getStatus: async () => connection.sendRequest("session.auth.getStatus", { sessionId }),
+      /**
+       * Updates the session's auth credentials used for outbound model and API requests.
+       *
+       * @param params New auth credentials to install on the session. Omit to leave credentials unchanged.
+       *
+       * @returns Indicates whether the credential update succeeded.
+       */
+      setCredentials: async (params) => connection.sendRequest("session.auth.setCredentials", { sessionId, ...params })
     },
+    /** @experimental */
+    canvas: {
+      /**
+       * Lists canvases declared for the session.
+       *
+       * @returns Declared canvases available in this session.
+       */
+      list: async () => connection.sendRequest("session.canvas.list", { sessionId }),
+      /**
+       * Lists currently open canvas instances for the live session.
+       *
+       * @returns Live open-canvas snapshot.
+       */
+      listOpen: async () => connection.sendRequest("session.canvas.listOpen", { sessionId }),
+      /**
+       * Opens or focuses a canvas instance.
+       *
+       * @param params Canvas open parameters.
+       *
+       * @returns Open canvas instance snapshot.
+       */
+      open: async (params) => connection.sendRequest("session.canvas.open", { sessionId, ...params }),
+      /**
+       * Closes an open canvas instance.
+       *
+       * @param params Canvas close parameters.
+       */
+      close: async (params) => connection.sendRequest("session.canvas.close", { sessionId, ...params }),
+      /**
+       * Invokes an action on an open canvas instance.
+       *
+       * @param params Canvas action invocation parameters.
+       *
+       * @returns Canvas action invocation result.
+       */
+      invokeAction: async (params) => connection.sendRequest("session.canvas.invokeAction", { sessionId, ...params })
+    },
+    /** @experimental */
+    model: {
+      /**
+       * Gets the currently selected model for the session.
+       *
+       * @returns The currently selected model and reasoning effort for the session.
+       */
+      getCurrent: async () => connection.sendRequest("session.model.getCurrent", { sessionId }),
+      /**
+       * Switches the session to a model and optional reasoning configuration.
+       *
+       * @param params Target model identifier and optional reasoning effort, summary, and capability overrides.
+       *
+       * @returns The model identifier active on the session after the switch.
+       */
+      switchTo: async (params) => connection.sendRequest("session.model.switchTo", { sessionId, ...params }),
+      /**
+       * Updates the session's reasoning effort without changing the selected model.
+       *
+       * @param params Reasoning effort level to apply to the currently selected model.
+       *
+       * @returns Update the session's reasoning effort without changing the selected model. Use `switchTo` instead when you also need to change the model. The runtime stores the effort on the session and applies it to subsequent turns.
+       */
+      setReasoningEffort: async (params) => connection.sendRequest("session.model.setReasoningEffort", { sessionId, ...params })
+    },
+    /** @experimental */
     mode: {
+      /**
+       * Gets the current agent interaction mode.
+       *
+       * @returns The session mode the agent is operating in
+       */
       get: async () => connection.sendRequest("session.mode.get", { sessionId }),
+      /**
+       * Sets the current agent interaction mode.
+       *
+       * @param params Agent interaction mode to apply to the session.
+       */
       set: async (params) => connection.sendRequest("session.mode.set", { sessionId, ...params })
     },
+    /** @experimental */
+    name: {
+      /**
+       * Gets the session's friendly name.
+       *
+       * @returns The session's friendly name, or null when not yet set.
+       */
+      get: async () => connection.sendRequest("session.name.get", { sessionId }),
+      /**
+       * Sets the session's friendly name.
+       *
+       * @param params New friendly name to apply to the session.
+       */
+      set: async (params) => connection.sendRequest("session.name.set", { sessionId, ...params }),
+      /**
+       * Persists an auto-generated session summary as the session's name when no user-set name exists.
+       *
+       * @param params Auto-generated session summary to apply as the session's name when no user-set name exists.
+       *
+       * @returns Indicates whether the auto-generated summary was applied as the session's name.
+       */
+      setAuto: async (params) => connection.sendRequest("session.name.setAuto", { sessionId, ...params })
+    },
+    /** @experimental */
     plan: {
+      /**
+       * Reads the session plan file from the workspace.
+       *
+       * @returns Existence, contents, and resolved path of the session plan file.
+       */
       read: async () => connection.sendRequest("session.plan.read", { sessionId }),
+      /**
+       * Writes new content to the session plan file.
+       *
+       * @param params Replacement contents to write to the session plan file.
+       */
       update: async (params) => connection.sendRequest("session.plan.update", { sessionId, ...params }),
+      /**
+       * Deletes the session plan file from the workspace.
+       */
       delete: async () => connection.sendRequest("session.plan.delete", { sessionId })
     },
-    workspace: {
-      listFiles: async () => connection.sendRequest("session.workspace.listFiles", { sessionId }),
-      readFile: async (params) => connection.sendRequest("session.workspace.readFile", { sessionId, ...params }),
-      createFile: async (params) => connection.sendRequest("session.workspace.createFile", { sessionId, ...params })
+    /** @experimental */
+    workspaces: {
+      /**
+       * Gets current workspace metadata for the session.
+       *
+       * @returns Current workspace metadata for the session, including its absolute filesystem path when available.
+       */
+      getWorkspace: async () => connection.sendRequest("session.workspaces.getWorkspace", { sessionId }),
+      /**
+       * Lists files stored in the session workspace files directory.
+       *
+       * @returns Relative paths of files stored in the session workspace files directory.
+       */
+      listFiles: async () => connection.sendRequest("session.workspaces.listFiles", { sessionId }),
+      /**
+       * Reads a file from the session workspace files directory.
+       *
+       * @param params Relative path of the workspace file to read.
+       *
+       * @returns Contents of the requested workspace file as a UTF-8 string.
+       */
+      readFile: async (params) => connection.sendRequest("session.workspaces.readFile", { sessionId, ...params }),
+      /**
+       * Creates or overwrites a file in the session workspace files directory.
+       *
+       * @param params Relative path and UTF-8 content for the workspace file to create or overwrite.
+       */
+      createFile: async (params) => connection.sendRequest("session.workspaces.createFile", { sessionId, ...params }),
+      /**
+       * Lists workspace checkpoints in chronological order.
+       *
+       * @returns Workspace checkpoints in chronological order; empty when the workspace is not enabled.
+       */
+      listCheckpoints: async () => connection.sendRequest("session.workspaces.listCheckpoints", { sessionId }),
+      /**
+       * Reads the content of a workspace checkpoint by number.
+       *
+       * @param params Checkpoint number to read.
+       *
+       * @returns Checkpoint content as a UTF-8 string, or null when the checkpoint or workspace is missing.
+       */
+      readCheckpoint: async (params) => connection.sendRequest("session.workspaces.readCheckpoint", { sessionId, ...params }),
+      /**
+       * Saves pasted content as a UTF-8 file in the session workspace.
+       *
+       * @param params Pasted content to save as a UTF-8 file in the session workspace.
+       *
+       * @returns Descriptor for the saved paste file, or null when the workspace is unavailable.
+       */
+      saveLargePaste: async (params) => connection.sendRequest("session.workspaces.saveLargePaste", { sessionId, ...params }),
+      /**
+       * Computes a diff for the session workspace.
+       *
+       * @param params Parameters for computing a workspace diff.
+       *
+       * @returns Workspace diff result for the requested mode.
+       */
+      diff: async (params) => connection.sendRequest("session.workspaces.diff", { sessionId, ...params })
+    },
+    /** @experimental */
+    instructions: {
+      /**
+       * Gets instruction sources loaded for the session.
+       *
+       * @returns Instruction sources loaded for the session, in merge order.
+       */
+      getSources: async () => connection.sendRequest("session.instructions.getSources", { sessionId })
     },
     /** @experimental */
     fleet: {
+      /**
+       * Starts fleet mode by submitting the fleet orchestration prompt to the session.
+       *
+       * @param params Optional user prompt to combine with the fleet orchestration instructions.
+       *
+       * @returns Indicates whether fleet mode was successfully activated.
+       */
       start: async (params) => connection.sendRequest("session.fleet.start", { sessionId, ...params })
     },
     /** @experimental */
     agent: {
+      /**
+       * Lists custom agents available to the session.
+       *
+       * @returns Custom agents available to the session.
+       */
       list: async () => connection.sendRequest("session.agent.list", { sessionId }),
+      /**
+       * Gets the currently selected custom agent for the session.
+       *
+       * @returns The currently selected custom agent, or null when using the default agent.
+       */
       getCurrent: async () => connection.sendRequest("session.agent.getCurrent", { sessionId }),
+      /**
+       * Selects a custom agent for subsequent turns in the session.
+       *
+       * @param params Name of the custom agent to select for subsequent turns.
+       *
+       * @returns The newly selected custom agent.
+       */
       select: async (params) => connection.sendRequest("session.agent.select", { sessionId, ...params }),
+      /**
+       * Clears the selected custom agent and returns the session to the default agent.
+       */
       deselect: async () => connection.sendRequest("session.agent.deselect", { sessionId }),
+      /**
+       * Reloads custom agent definitions and returns the refreshed list.
+       *
+       * @returns Custom agents available to the session after reloading definitions from disk.
+       */
       reload: async () => connection.sendRequest("session.agent.reload", { sessionId })
     },
     /** @experimental */
+    tasks: {
+      /**
+       * Starts a background agent task in the session.
+       *
+       * @param params Agent type, prompt, name, and optional description and model override for the new task.
+       *
+       * @returns Identifier assigned to the newly started background agent task.
+       */
+      startAgent: async (params) => connection.sendRequest("session.tasks.startAgent", { sessionId, ...params }),
+      /**
+       * Lists background tasks tracked by the session.
+       *
+       * @returns Background tasks currently tracked by the session.
+       */
+      list: async () => connection.sendRequest("session.tasks.list", { sessionId }),
+      /**
+       * Refreshes metadata for any detached background shells the runtime knows about.
+       *
+       * @returns Refresh metadata for any detached background shells the runtime knows about. Use after a long pause to pick up exit/output state for shells running outside the agent loop.
+       */
+      refresh: async () => connection.sendRequest("session.tasks.refresh", { sessionId }),
+      /**
+       * Waits for all in-flight background tasks and any follow-up turns to settle.
+       *
+       * @returns Wait until all in-flight background tasks (agents + shells) and any follow-up turns scheduled by their completions have settled. Returns when the runtime is fully drained or after an internal timeout (default 10 minutes; configurable via COPILOT_TASK_WAIT_TIMEOUT_SECONDS).
+       */
+      waitForPending: async () => connection.sendRequest("session.tasks.waitForPending", { sessionId }),
+      /**
+       * Returns progress information for a background task by ID.
+       *
+       * @param params Identifier of the background task to fetch progress for.
+       *
+       * @returns Progress information for the task, or null when no task with that ID is tracked.
+       */
+      getProgress: async (params) => connection.sendRequest("session.tasks.getProgress", { sessionId, ...params }),
+      /**
+       * Returns the first sync-waiting task that can currently be promoted to background mode.
+       *
+       * @returns The first sync-waiting task that can currently be promoted to background mode.
+       */
+      getCurrentPromotable: async () => connection.sendRequest("session.tasks.getCurrentPromotable", { sessionId }),
+      /**
+       * Promotes an eligible synchronously-waited task so it continues running in the background.
+       *
+       * @param params Identifier of the task to promote to background mode.
+       *
+       * @returns Indicates whether the task was successfully promoted to background mode.
+       */
+      promoteToBackground: async (params) => connection.sendRequest("session.tasks.promoteToBackground", { sessionId, ...params }),
+      /**
+       * Atomically promotes the first promotable sync-waiting task to background mode and returns it.
+       *
+       * @returns The promoted task as it now exists in background mode, omitted if no promotable task was waiting.
+       */
+      promoteCurrentToBackground: async () => connection.sendRequest("session.tasks.promoteCurrentToBackground", { sessionId }),
+      /**
+       * Cancels a background task.
+       *
+       * @param params Identifier of the background task to cancel.
+       *
+       * @returns Indicates whether the background task was successfully cancelled.
+       */
+      cancel: async (params) => connection.sendRequest("session.tasks.cancel", { sessionId, ...params }),
+      /**
+       * Removes a completed or cancelled background task from tracking.
+       *
+       * @param params Identifier of the completed or cancelled task to remove from tracking.
+       *
+       * @returns Indicates whether the task was removed. False when the task does not exist or is still running/idle.
+       */
+      remove: async (params) => connection.sendRequest("session.tasks.remove", { sessionId, ...params }),
+      /**
+       * Sends a message to a background agent task.
+       *
+       * @param params Identifier of the target agent task, message content, and optional sender agent ID.
+       *
+       * @returns Indicates whether the message was delivered, with an error message when delivery failed.
+       */
+      sendMessage: async (params) => connection.sendRequest("session.tasks.sendMessage", { sessionId, ...params })
+    },
+    /** @experimental */
     skills: {
+      /**
+       * Lists skills available to the session.
+       *
+       * @returns Skills available to the session, with their enabled state.
+       */
       list: async () => connection.sendRequest("session.skills.list", { sessionId }),
+      /**
+       * Returns the skills that have been invoked during this session.
+       *
+       * @returns Skills invoked during this session, ordered by invocation time (most recent last).
+       */
+      getInvoked: async () => connection.sendRequest("session.skills.getInvoked", { sessionId }),
+      /**
+       * Enables a skill for the session.
+       *
+       * @param params Name of the skill to enable for the session.
+       */
       enable: async (params) => connection.sendRequest("session.skills.enable", { sessionId, ...params }),
+      /**
+       * Disables a skill for the session.
+       *
+       * @param params Name of the skill to disable for the session.
+       */
       disable: async (params) => connection.sendRequest("session.skills.disable", { sessionId, ...params }),
-      reload: async () => connection.sendRequest("session.skills.reload", { sessionId })
+      /**
+       * Reloads skill definitions for the session.
+       *
+       * @returns Diagnostics from reloading skill definitions, with warnings and errors as separate lists.
+       */
+      reload: async () => connection.sendRequest("session.skills.reload", { sessionId }),
+      /**
+       * Ensures the session's skill definitions have been loaded from disk.
+       */
+      ensureLoaded: async () => connection.sendRequest("session.skills.ensureLoaded", { sessionId })
     },
     /** @experimental */
     mcp: {
+      /**
+       * Lists MCP servers configured for the session and their connection status.
+       *
+       * @returns MCP servers configured for the session, with their connection status.
+       */
       list: async () => connection.sendRequest("session.mcp.list", { sessionId }),
+      /**
+       * Enables an MCP server for the session.
+       *
+       * @param params Name of the MCP server to enable for the session.
+       */
       enable: async (params) => connection.sendRequest("session.mcp.enable", { sessionId, ...params }),
+      /**
+       * Disables an MCP server for the session.
+       *
+       * @param params Name of the MCP server to disable for the session.
+       */
       disable: async (params) => connection.sendRequest("session.mcp.disable", { sessionId, ...params }),
-      reload: async () => connection.sendRequest("session.mcp.reload", { sessionId })
+      /**
+       * Reloads MCP server connections for the session.
+       */
+      reload: async () => connection.sendRequest("session.mcp.reload", { sessionId }),
+      /**
+       * Runs an MCP sampling inference on behalf of an MCP server.
+       *
+       * @param params Identifiers and raw MCP CreateMessageRequest params used to run a sampling inference.
+       *
+       * @returns Outcome of an MCP sampling execution: success result, failure error, or cancellation.
+       */
+      executeSampling: async (params) => connection.sendRequest("session.mcp.executeSampling", { sessionId, ...params }),
+      /**
+       * Cancels an in-flight MCP sampling execution by request ID.
+       *
+       * @param params The requestId previously passed to executeSampling that should be cancelled.
+       *
+       * @returns Indicates whether an in-flight sampling execution with the given requestId was found and cancelled.
+       */
+      cancelSamplingExecution: async (params) => connection.sendRequest("session.mcp.cancelSamplingExecution", { sessionId, ...params }),
+      /**
+       * Sets how environment-variable values supplied to MCP servers are resolved (direct or indirect).
+       *
+       * @param params Mode controlling how MCP server env values are resolved (`direct` or `indirect`).
+       *
+       * @returns Env-value mode recorded on the session after the update.
+       */
+      setEnvValueMode: async (params) => connection.sendRequest("session.mcp.setEnvValueMode", { sessionId, ...params }),
+      /**
+       * Removes the auto-managed `github` MCP server when present.
+       *
+       * @returns Indicates whether the auto-managed `github` MCP server was removed (false when nothing to remove).
+       */
+      removeGitHub: async () => connection.sendRequest("session.mcp.removeGitHub", { sessionId }),
+      /** @experimental */
+      oauth: {
+        /**
+         * Starts OAuth authentication for a remote MCP server.
+         *
+         * @param params Remote MCP server name and optional overrides controlling reauthentication, OAuth client display name, and the callback success-page copy.
+         *
+         * @returns OAuth authorization URL the caller should open, or empty when cached tokens already authenticated the server.
+         */
+        login: async (params) => connection.sendRequest("session.mcp.oauth.login", { sessionId, ...params })
+      },
+      /** @experimental */
+      apps: {
+        /**
+         * Fetch an MCP resource (typically a `ui://` MCP App bundle, per SEP-1865) from a connected server. Requires the `mcp-apps` session capability.
+         *
+         * @param params MCP server and resource URI to fetch.
+         *
+         * @returns Resource contents returned by the MCP server.
+         */
+        readResource: async (params) => connection.sendRequest("session.mcp.apps.readResource", { sessionId, ...params }),
+        /**
+         * List tools that an MCP App view is allowed to call (SEP-1865 visibility filter). Returns tools whose `_meta.ui.visibility` is unset (default `["model","app"]`) or includes `"app"`.
+         *
+         * @param params MCP server to list app-callable tools for.
+         *
+         * @returns App-callable tools from the named MCP server.
+         */
+        listTools: async (params) => connection.sendRequest("session.mcp.apps.listTools", { sessionId, ...params }),
+        /**
+         * Call an MCP tool from an MCP App view (SEP-1865). Enforces the visibility check that prevents an app iframe from invoking model-only tools. Returns the standard MCP `CallToolResult`.
+         *
+         * @param params MCP server, tool name, and arguments to invoke from an MCP App view.
+         *
+         * @returns Standard MCP CallToolResult
+         */
+        callTool: async (params) => connection.sendRequest("session.mcp.apps.callTool", { sessionId, ...params }),
+        /**
+         * Replace the host context returned to MCP App guests on `ui/initialize`. Hosts use this to advertise theme, locale, or other metadata to the guest UI.
+         *
+         * @param params Host context to advertise to MCP App guests.
+         */
+        setHostContext: async (params) => connection.sendRequest("session.mcp.apps.setHostContext", { sessionId, ...params }),
+        /**
+         * Read the current host context advertised to MCP App guests.
+         *
+         * @returns Current host context advertised to MCP App guests.
+         */
+        getHostContext: async () => connection.sendRequest("session.mcp.apps.getHostContext", { sessionId }),
+        /**
+         * Diagnose MCP Apps wiring for a specific MCP server. Reports the session capability, feature-flag state, advertised extension, and how many tools have `_meta.ui` populated.
+         *
+         * @param params MCP server to diagnose MCP Apps wiring for.
+         *
+         * @returns Diagnostic snapshot of MCP Apps wiring for the named server.
+         */
+        diagnose: async (params) => connection.sendRequest("session.mcp.apps.diagnose", { sessionId, ...params })
+      }
     },
     /** @experimental */
     plugins: {
+      /**
+       * Lists plugins installed for the session.
+       *
+       * @returns Plugins installed for the session, with their enabled state and version metadata.
+       */
       list: async () => connection.sendRequest("session.plugins.list", { sessionId })
     },
     /** @experimental */
+    options: {
+      /**
+       * Patches the genuinely-mutable subset of session options.
+       *
+       * @param params Patch of mutable session options to apply to the running session.
+       *
+       * @returns Indicates whether the session options patch was applied successfully.
+       */
+      update: async (params) => connection.sendRequest("session.options.update", { sessionId, ...params })
+    },
+    /** @experimental */
+    lsp: {
+      /**
+       * Loads the merged LSP configuration set for the session's working directory.
+       *
+       * @param params Parameters for (re)loading the merged LSP configuration set.
+       */
+      initialize: async (params) => connection.sendRequest("session.lsp.initialize", { sessionId, ...params })
+    },
+    /** @experimental */
     extensions: {
+      /**
+       * Lists extensions discovered for the session and their current status.
+       *
+       * @returns Extensions discovered for the session, with their current status.
+       */
       list: async () => connection.sendRequest("session.extensions.list", { sessionId }),
+      /**
+       * Enables an extension for the session.
+       *
+       * @param params Source-qualified extension identifier to enable for the session.
+       */
       enable: async (params) => connection.sendRequest("session.extensions.enable", { sessionId, ...params }),
+      /**
+       * Disables an extension for the session.
+       *
+       * @param params Source-qualified extension identifier to disable for the session.
+       */
       disable: async (params) => connection.sendRequest("session.extensions.disable", { sessionId, ...params }),
+      /**
+       * Reloads extension definitions and processes for the session.
+       */
       reload: async () => connection.sendRequest("session.extensions.reload", { sessionId })
     },
+    /** @experimental */
     tools: {
-      handlePendingToolCall: async (params) => connection.sendRequest("session.tools.handlePendingToolCall", { sessionId, ...params })
+      /**
+       * Provides the result for a pending external tool call.
+       *
+       * @param params Pending external tool call request ID, with the tool result or an error describing why it failed.
+       *
+       * @returns Indicates whether the external tool call result was handled successfully.
+       */
+      handlePendingToolCall: async (params) => connection.sendRequest("session.tools.handlePendingToolCall", { sessionId, ...params }),
+      /**
+       * Resolves, builds, and validates the runtime tool list for the session.
+       *
+       * @returns Resolve, build, and validate the runtime tool list for this session. Subagent sessions and consumer flows that need an initialized tool set before `send` invoke this. Default base-class implementation is a no-op for sessions that don't support tool validation.
+       */
+      initializeAndValidate: async () => connection.sendRequest("session.tools.initializeAndValidate", { sessionId })
     },
+    /** @experimental */
     commands: {
-      handlePendingCommand: async (params) => connection.sendRequest("session.commands.handlePendingCommand", { sessionId, ...params })
+      /**
+       * Lists slash commands available in the session.
+       *
+       * @param params Optional filters controlling which command sources to include in the listing.
+       *
+       * @returns Slash commands available in the session, after applying any include/exclude filters.
+       */
+      list: async (params) => connection.sendRequest("session.commands.list", { sessionId, ...params }),
+      /**
+       * Invokes a slash command in the session.
+       *
+       * @param params Slash command name and optional raw input string to invoke.
+       *
+       * @returns Result of invoking the slash command (text output, prompt to send to the agent, or completion).
+       */
+      invoke: async (params) => connection.sendRequest("session.commands.invoke", { sessionId, ...params }),
+      /**
+       * Reports completion of a pending client-handled slash command.
+       *
+       * @param params Pending command request ID and an optional error if the client handler failed.
+       *
+       * @returns Indicates whether the pending client-handled command was completed successfully.
+       */
+      handlePendingCommand: async (params) => connection.sendRequest("session.commands.handlePendingCommand", { sessionId, ...params }),
+      /**
+       * Executes a slash command synchronously and returns any error.
+       *
+       * @param params Slash command name and argument string to execute synchronously.
+       *
+       * @returns Error message produced while executing the command, if any.
+       */
+      execute: async (params) => connection.sendRequest("session.commands.execute", { sessionId, ...params }),
+      /**
+       * Enqueues a slash command for FIFO processing on the local session.
+       *
+       * @param params Slash-prefixed command string to enqueue for FIFO processing.
+       *
+       * @returns Indicates whether the command was accepted into the local execution queue.
+       */
+      enqueue: async (params) => connection.sendRequest("session.commands.enqueue", { sessionId, ...params }),
+      /**
+       * Reports whether the host actually executed a queued command and whether to continue processing.
+       *
+       * @param params Queued-command request ID and the result indicating whether the host executed it (and whether to stop processing further queued commands).
+       *
+       * @returns Indicates whether the queued-command response was matched to a pending request.
+       */
+      respondToQueuedCommand: async (params) => connection.sendRequest("session.commands.respondToQueuedCommand", { sessionId, ...params })
     },
+    /** @experimental */
+    telemetry: {
+      /**
+       * Sets feature override key/value pairs to attach to subsequent telemetry events for the session.
+       *
+       * @param params Feature override key/value pairs to attach to subsequent telemetry events from this session.
+       */
+      setFeatureOverrides: async (params) => connection.sendRequest("session.telemetry.setFeatureOverrides", { sessionId, ...params })
+    },
+    /** @experimental */
     ui: {
+      /**
+       * Requests structured input from a UI-capable client.
+       *
+       * @param params Prompt message and JSON schema describing the form fields to elicit from the user.
+       *
+       * @returns The elicitation response (accept with form values, decline, or cancel)
+       */
       elicitation: async (params) => connection.sendRequest("session.ui.elicitation", { sessionId, ...params }),
-      handlePendingElicitation: async (params) => connection.sendRequest("session.ui.handlePendingElicitation", { sessionId, ...params })
+      /**
+       * Provides the user response for a pending elicitation request.
+       *
+       * @param params Pending elicitation request ID and the user's response (accept/decline/cancel + form values).
+       *
+       * @returns Indicates whether the elicitation response was accepted; false if it was already resolved by another client.
+       */
+      handlePendingElicitation: async (params) => connection.sendRequest("session.ui.handlePendingElicitation", { sessionId, ...params }),
+      /**
+       * Resolves a pending `user_input.requested` event with the user's response.
+       *
+       * @param params Request ID of a pending `user_input.requested` event and the user's response.
+       *
+       * @returns Indicates whether the pending UI request was resolved by this call.
+       */
+      handlePendingUserInput: async (params) => connection.sendRequest("session.ui.handlePendingUserInput", { sessionId, ...params }),
+      /**
+       * Resolves a pending `sampling.requested` event with a sampling result, or rejects it.
+       *
+       * @param params Request ID of a pending `sampling.requested` event and an optional sampling result payload (omit to reject).
+       *
+       * @returns Indicates whether the pending UI request was resolved by this call.
+       */
+      handlePendingSampling: async (params) => connection.sendRequest("session.ui.handlePendingSampling", { sessionId, ...params }),
+      /**
+       * Resolves a pending `auto_mode_switch.requested` event with the user's accept/decline decision.
+       *
+       * @param params Request ID of a pending `auto_mode_switch.requested` event and the user's response.
+       *
+       * @returns Indicates whether the pending UI request was resolved by this call.
+       */
+      handlePendingAutoModeSwitch: async (params) => connection.sendRequest("session.ui.handlePendingAutoModeSwitch", { sessionId, ...params }),
+      /**
+       * Resolves a pending `exit_plan_mode.requested` event with the user's response.
+       *
+       * @param params Request ID of a pending `exit_plan_mode.requested` event and the user's response.
+       *
+       * @returns Indicates whether the pending UI request was resolved by this call.
+       */
+      handlePendingExitPlanMode: async (params) => connection.sendRequest("session.ui.handlePendingExitPlanMode", { sessionId, ...params }),
+      /**
+       * Registers an in-process handler for auto-mode-switch requests so the server bridge skips dispatch.
+       *
+       * @returns Register an in-process handler for `auto_mode_switch.requested` events. The caller still attaches the actual listener via the standard event-subscription mechanism; this registration solely tells the server bridge to skip its own dispatch (so a remote client doesn't race the in-process handler for the same requestId).
+       */
+      registerDirectAutoModeSwitchHandler: async () => connection.sendRequest("session.ui.registerDirectAutoModeSwitchHandler", { sessionId }),
+      /**
+       * Unregisters a previously-registered in-process auto-mode-switch handler by its opaque handle.
+       *
+       * @param params Opaque handle previously returned by `registerDirectAutoModeSwitchHandler` to release.
+       *
+       * @returns Indicates whether the handle was active and the registration count was decremented.
+       */
+      unregisterDirectAutoModeSwitchHandler: async (params) => connection.sendRequest("session.ui.unregisterDirectAutoModeSwitchHandler", { sessionId, ...params })
     },
+    /** @experimental */
     permissions: {
-      handlePendingPermissionRequest: async (params) => connection.sendRequest("session.permissions.handlePendingPermissionRequest", { sessionId, ...params })
+      /**
+       * Replaces selected permission policy fields (rules, paths, URLs, exclusions, allow-all flags) on the session.
+       *
+       * @param params Patch of permission policy fields to apply (omit a field to leave it unchanged).
+       *
+       * @returns Indicates whether the operation succeeded.
+       */
+      configure: async (params) => connection.sendRequest("session.permissions.configure", { sessionId, ...params }),
+      /**
+       * Provides a decision for a pending tool permission request.
+       *
+       * @param params Pending permission request ID and the decision to apply (approve/reject and scope).
+       *
+       * @returns Indicates whether the permission decision was applied; false when the request was already resolved.
+       */
+      handlePendingPermissionRequest: async (params) => connection.sendRequest("session.permissions.handlePendingPermissionRequest", { sessionId, ...params }),
+      /**
+       * Reconstructs the set of pending tool permission requests from the session's event history.
+       *
+       * @returns List of pending permission requests reconstructed from event history.
+       */
+      pendingRequests: async () => connection.sendRequest("session.permissions.pendingRequests", { sessionId }),
+      /**
+       * Enables or disables automatic approval of tool permission requests for the session.
+       *
+       * @param params Allow-all toggle for tool permission requests, with an optional telemetry source.
+       *
+       * @returns Indicates whether the operation succeeded.
+       */
+      setApproveAll: async (params) => connection.sendRequest("session.permissions.setApproveAll", { sessionId, ...params }),
+      /**
+       * Enables or disables full allow-all permissions (tools, paths, and URLs) for the session. Used by attach-mode clients (e.g. LocalRpcSession's `/allow-all` forwarder) to flip the target session's permission state. Unlike `setApproveAll`, this swaps in the unrestricted path and URL managers and emits `session.permissions_changed` on transition. The result returns the authoritative post-mutation state so callers can update their local mirrors without racing the `session.permissions_changed` notification on the same wire.
+       *
+       * @param params Whether to enable full allow-all permissions for the session.
+       *
+       * @returns Indicates whether the operation succeeded and reports the post-mutation state.
+       */
+      setAllowAll: async (params) => connection.sendRequest("session.permissions.setAllowAll", { sessionId, ...params }),
+      /**
+       * Returns whether full allow-all permissions are currently active for the session.
+       *
+       * @returns Current full allow-all permission state.
+       */
+      getAllowAll: async () => connection.sendRequest("session.permissions.getAllowAll", { sessionId }),
+      /**
+       * Adds or removes session-scoped or location-scoped permission rules.
+       *
+       * @param params Scope and add/remove instructions for modifying session- or location-scoped permission rules.
+       *
+       * @returns Indicates whether the operation succeeded.
+       */
+      modifyRules: async (params) => connection.sendRequest("session.permissions.modifyRules", { sessionId, ...params }),
+      /**
+       * Sets whether the client wants permission prompts bridged into session events.
+       *
+       * @param params Toggles whether permission prompts should be bridged into session events for this client.
+       *
+       * @returns Indicates whether the operation succeeded.
+       */
+      setRequired: async (params) => connection.sendRequest("session.permissions.setRequired", { sessionId, ...params }),
+      /**
+       * Clears session-scoped tool permission approvals.
+       *
+       * @returns Indicates whether the operation succeeded.
+       */
+      resetSessionApprovals: async () => connection.sendRequest("session.permissions.resetSessionApprovals", { sessionId }),
+      /**
+       * Notifies the runtime that a permission prompt UI has been shown to the user.
+       *
+       * @param params Notification payload describing the permission prompt that the client just rendered.
+       *
+       * @returns Indicates whether the operation succeeded.
+       */
+      notifyPromptShown: async (params) => connection.sendRequest("session.permissions.notifyPromptShown", { sessionId, ...params }),
+      /** @experimental */
+      paths: {
+        /**
+         * Returns the session's allowed directories and primary working directory.
+         *
+         * @returns Snapshot of the session's allow-listed directories and primary working directory.
+         */
+        list: async () => connection.sendRequest("session.permissions.paths.list", { sessionId }),
+        /**
+         * Adds a directory to the session's allow-list.
+         *
+         * @param params Directory path to add to the session's allowed directories.
+         *
+         * @returns Indicates whether the operation succeeded.
+         */
+        add: async (params) => connection.sendRequest("session.permissions.paths.add", { sessionId, ...params }),
+        /**
+         * Updates the session's primary working directory used by the permission policy.
+         *
+         * @param params Directory path to set as the session's new primary working directory.
+         *
+         * @returns Indicates whether the operation succeeded.
+         */
+        updatePrimary: async (params) => connection.sendRequest("session.permissions.paths.updatePrimary", { sessionId, ...params }),
+        /**
+         * Reports whether a path falls within any of the session's allowed directories.
+         *
+         * @param params Path to evaluate against the session's allowed directories.
+         *
+         * @returns Indicates whether the supplied path is within the session's allowed directories.
+         */
+        isPathWithinAllowedDirectories: async (params) => connection.sendRequest("session.permissions.paths.isPathWithinAllowedDirectories", { sessionId, ...params }),
+        /**
+         * Reports whether a path falls within the session's workspace (primary) directory.
+         *
+         * @param params Path to evaluate against the session's workspace (primary) directory.
+         *
+         * @returns Indicates whether the supplied path is within the session's workspace directory.
+         */
+        isPathWithinWorkspace: async (params) => connection.sendRequest("session.permissions.paths.isPathWithinWorkspace", { sessionId, ...params })
+      },
+      /** @experimental */
+      locations: {
+        /**
+         * Resolves the permission location key and type for a working directory.
+         *
+         * @param params Working directory to resolve into a location-permissions key.
+         *
+         * @returns Resolved location-permissions key and type.
+         */
+        resolve: async (params) => connection.sendRequest("session.permissions.locations.resolve", { sessionId, ...params }),
+        /**
+         * Applies persisted location-scoped tool approvals and allowed directories for a working directory to this session's permission service.
+         *
+         * @param params Working directory to load persisted location permissions for.
+         *
+         * @returns Summary of persisted location permissions applied to the session.
+         */
+        apply: async (params) => connection.sendRequest("session.permissions.locations.apply", { sessionId, ...params }),
+        /**
+         * Persists a tool approval for a permission location and applies its rules to this session's live permission service.
+         *
+         * @param params Location-scoped tool approval to persist.
+         *
+         * @returns Indicates whether the operation succeeded.
+         */
+        addToolApproval: async (params) => connection.sendRequest("session.permissions.locations.addToolApproval", { sessionId, ...params })
+      },
+      /** @experimental */
+      folderTrust: {
+        /**
+         * Reports whether a folder is trusted according to the user's folder trust state.
+         *
+         * @param params Folder path to check for trust.
+         *
+         * @returns Folder trust check result.
+         */
+        isTrusted: async (params) => connection.sendRequest("session.permissions.folderTrust.isTrusted", { sessionId, ...params }),
+        /**
+         * Adds a folder to the user's trusted folders list.
+         *
+         * @param params Folder path to add to trusted folders.
+         *
+         * @returns Indicates whether the operation succeeded.
+         */
+        addTrusted: async (params) => connection.sendRequest("session.permissions.folderTrust.addTrusted", { sessionId, ...params })
+      },
+      /** @experimental */
+      urls: {
+        /**
+         * Toggles the runtime's URL-permission policy between unrestricted and restricted modes.
+         *
+         * @param params Whether the URL-permission policy should run in unrestricted mode.
+         *
+         * @returns Indicates whether the operation succeeded.
+         */
+        setUnrestrictedMode: async (params) => connection.sendRequest("session.permissions.urls.setUnrestrictedMode", { sessionId, ...params })
+      }
     },
+    /**
+     * Emits a user-visible session log event.
+     *
+     * @param params Message text, optional severity level, persistence flag, optional follow-up URL, and optional tip.
+     *
+     * @returns Identifier of the session event that was emitted for the log message.
+     *
+     * @experimental
+     */
     log: async (params) => connection.sendRequest("session.log", { sessionId, ...params }),
+    /** @experimental */
+    metadata: {
+      /**
+       * Returns a snapshot of the session's identifying metadata, mode, agent, and remote info.
+       *
+       * @returns Point-in-time snapshot of slow-changing session identifier and state fields
+       */
+      snapshot: async () => connection.sendRequest("session.metadata.snapshot", { sessionId }),
+      /**
+       * Reports whether the local session is currently processing user/agent messages.
+       *
+       * @returns Indicates whether the local session is currently processing a turn or background continuation.
+       */
+      isProcessing: async () => connection.sendRequest("session.metadata.isProcessing", { sessionId }),
+      /**
+       * Returns the token breakdown for the session's current context window for a given model.
+       *
+       * @param params Model identifier and token limits used to compute the context-info breakdown.
+       *
+       * @returns Token breakdown for the session's current context window, or null if uninitialized.
+       */
+      contextInfo: async (params) => connection.sendRequest("session.metadata.contextInfo", { sessionId, ...params }),
+      /**
+       * Records a working-directory/git context change and emits a `session.context_changed` event.
+       *
+       * @param params Updated working-directory/git context to record on the session.
+       *
+       * @returns Notify the session that its working directory context has changed. Emits a `session.context_changed` event so consumers (telemetry, OTel tracker, ACP, the timeline UI) can react. Use this when the host has detected a cwd/branch/repo change outside the session's normal lifecycle (e.g., after a shell command in interactive mode).
+       */
+      recordContextChange: async (params) => connection.sendRequest("session.metadata.recordContextChange", { sessionId, ...params }),
+      /**
+       * Updates the session's recorded working directory.
+       *
+       * @param params Absolute path to set as the session's new working directory.
+       *
+       * @returns Update the session's working directory. Used by the host when the user explicitly changes cwd (e.g., the `/cd` slash command). The host is responsible for `process.chdir` and any related side-effects (file index, etc.); this method only updates the session's own recorded path.
+       */
+      setWorkingDirectory: async (params) => connection.sendRequest("session.metadata.setWorkingDirectory", { sessionId, ...params }),
+      /**
+       * Re-tokenizes the session's existing messages against a model and returns aggregate token totals.
+       *
+       * @param params Model identifier to use when re-tokenizing the session's existing messages.
+       *
+       * @returns Re-tokenize the session's existing messages against `modelId` and return the token totals. Useful for hosts that want an initial estimate of context usage on session resume, before the next agent turn fires `session.context_info_changed` events. Returns zeros for an empty session.
+       */
+      recomputeContextTokens: async (params) => connection.sendRequest("session.metadata.recomputeContextTokens", { sessionId, ...params })
+    },
+    /** @experimental */
     shell: {
+      /**
+       * Starts a shell command and streams output through session notifications.
+       *
+       * @param params Shell command to run, with optional working directory and timeout in milliseconds.
+       *
+       * @returns Identifier of the spawned process, used to correlate streamed output and exit notifications.
+       */
       exec: async (params) => connection.sendRequest("session.shell.exec", { sessionId, ...params }),
+      /**
+       * Sends a signal to a shell process previously started via "shell.exec".
+       *
+       * @param params Identifier of a process previously returned by "shell.exec" and the signal to send.
+       *
+       * @returns Indicates whether the signal was delivered; false if the process was unknown or already exited.
+       */
       kill: async (params) => connection.sendRequest("session.shell.kill", { sessionId, ...params })
     },
     /** @experimental */
     history: {
-      compact: async () => connection.sendRequest("session.history.compact", { sessionId }),
-      truncate: async (params) => connection.sendRequest("session.history.truncate", { sessionId, ...params })
+      /**
+       * Compacts the session history to reduce context usage.
+       *
+       * @param params Optional compaction parameters.
+       *
+       * @returns Compaction outcome with the number of tokens and messages removed, summary text, and the resulting context window breakdown.
+       */
+      compact: async (params) => connection.sendRequest("session.history.compact", { sessionId, ...params }),
+      /**
+       * Truncates persisted session history to a specific event.
+       *
+       * @param params Identifier of the event to truncate to; this event and all later events are removed.
+       *
+       * @returns Number of events that were removed by the truncation.
+       */
+      truncate: async (params) => connection.sendRequest("session.history.truncate", { sessionId, ...params }),
+      /**
+       * Cancels any in-progress background compaction on a local session.
+       *
+       * @returns Indicates whether an in-progress background compaction was cancelled.
+       */
+      cancelBackgroundCompaction: async () => connection.sendRequest("session.history.cancelBackgroundCompaction", { sessionId }),
+      /**
+       * Aborts any in-progress manual compaction on a local session.
+       *
+       * @returns Indicates whether an in-progress manual compaction was aborted.
+       */
+      abortManualCompaction: async () => connection.sendRequest("session.history.abortManualCompaction", { sessionId }),
+      /**
+       * Produces a markdown summary of the session's conversation context for hand-off scenarios.
+       *
+       * @returns Markdown summary of the conversation context (empty when not available).
+       */
+      summarizeForHandoff: async () => connection.sendRequest("session.history.summarizeForHandoff", { sessionId })
+    },
+    /** @experimental */
+    queue: {
+      /**
+       * Returns the local session's pending user-facing queued items and steering messages.
+       *
+       * @returns Snapshot of the session's pending queued items and immediate-steering messages.
+       */
+      pendingItems: async () => connection.sendRequest("session.queue.pendingItems", { sessionId }),
+      /**
+       * Removes the most recently queued user-facing item (LIFO).
+       *
+       * @returns Indicates whether a user-facing pending item was removed.
+       */
+      removeMostRecent: async () => connection.sendRequest("session.queue.removeMostRecent", { sessionId }),
+      /**
+       * Clears all pending queued items on the local session.
+       */
+      clear: async () => connection.sendRequest("session.queue.clear", { sessionId })
+    },
+    /** @experimental */
+    eventLog: {
+      /**
+       * Reads a batch of session events from a cursor, optionally waiting for new events.
+       *
+       * @param params Cursor, batch size, and optional long-poll/filter parameters for reading session events.
+       *
+       * @returns Batch of session events returned by a read, with cursor and continuation metadata.
+       */
+      read: async (params) => connection.sendRequest("session.eventLog.read", { sessionId, ...params }),
+      /**
+       * Returns a snapshot of the current tail cursor without consuming events.
+       *
+       * @returns Snapshot of the current tail cursor without returning any events. Use this when a consumer wants to subscribe to live events going forward without first paginating through the entire persisted history (which would happen if `read` were called without a cursor on a long-lived session).
+       */
+      tail: async () => connection.sendRequest("session.eventLog.tail", { sessionId }),
+      /**
+       * Registers consumer interest in an event type for runtime gating purposes.
+       *
+       * @param params Event type to register consumer interest for, used by runtime gating logic.
+       *
+       * @returns Opaque handle representing an event-type interest registration.
+       */
+      registerInterest: async (params) => connection.sendRequest("session.eventLog.registerInterest", { sessionId, ...params }),
+      /**
+       * Releases a consumer's previously-registered interest in an event type.
+       *
+       * @param params Opaque handle previously returned by `registerInterest` to release.
+       *
+       * @returns Indicates whether the operation succeeded.
+       */
+      releaseInterest: async (params) => connection.sendRequest("session.eventLog.releaseInterest", { sessionId, ...params })
+    },
+    /** @experimental */
+    usage: {
+      /**
+       * Gets accumulated usage metrics for the session.
+       *
+       * @returns Accumulated session usage metrics, including premium request cost, token counts, model breakdown, and code-change totals.
+       */
+      getMetrics: async () => connection.sendRequest("session.usage.getMetrics", { sessionId })
+    },
+    /** @experimental */
+    remote: {
+      /**
+       * Enables remote session export or steering.
+       *
+       * @param params Optional remote session mode ("off", "export", or "on"); defaults to enabling both export and remote steering.
+       *
+       * @returns GitHub URL for the session and a flag indicating whether remote steering is enabled.
+       */
+      enable: async (params) => connection.sendRequest("session.remote.enable", { sessionId, ...params }),
+      /**
+       * Disables remote session export and steering.
+       */
+      disable: async () => connection.sendRequest("session.remote.disable", { sessionId }),
+      /**
+       * Persists a remote-steerability change emitted by the host as a session event.
+       *
+       * @param params New remote-steerability state to persist as a `session.remote_steerable_changed` event.
+       *
+       * @returns Persist a steerability change as a `session.remote_steerable_changed` event. Used by the host (CLI / SDK consumer) when it has just finished enabling or disabling steering on a remote exporter that the runtime does not directly own.
+       */
+      notifySteerableChanged: async (params) => connection.sendRequest("session.remote.notifySteerableChanged", { sessionId, ...params })
+    },
+    /** @experimental */
+    schedule: {
+      /**
+       * Lists the session's currently active scheduled prompts.
+       *
+       * @returns Snapshot of the currently active recurring prompts for this session.
+       */
+      list: async () => connection.sendRequest("session.schedule.list", { sessionId }),
+      /**
+       * Removes a scheduled prompt by id.
+       *
+       * @param params Identifier of the scheduled prompt to remove.
+       *
+       * @returns Remove a scheduled prompt by id. The result entry is omitted if the id was unknown.
+       */
+      stop: async (params) => connection.sendRequest("session.schedule.stop", { sessionId, ...params })
     }
   };
 }
@@ -3458,6 +4753,31 @@ function registerClientSessionApiHandlers(connection, getHandlers) {
     if (!handler) throw new Error(`No sessionFs handler registered for session: ${params.sessionId}`);
     return handler.rename(params);
   });
+  connection.onRequest("sessionFs.sqliteQuery", async (params) => {
+    const handler = getHandlers(params.sessionId).sessionFs;
+    if (!handler) throw new Error(`No sessionFs handler registered for session: ${params.sessionId}`);
+    return handler.sqliteQuery(params);
+  });
+  connection.onRequest("sessionFs.sqliteExists", async (params) => {
+    const handler = getHandlers(params.sessionId).sessionFs;
+    if (!handler) throw new Error(`No sessionFs handler registered for session: ${params.sessionId}`);
+    return handler.sqliteExists(params);
+  });
+  connection.onRequest("canvas.open", async (params) => {
+    const handler = getHandlers(params.sessionId).canvas;
+    if (!handler) throw new Error(`No canvas handler registered for session: ${params.sessionId}`);
+    return handler.open(params);
+  });
+  connection.onRequest("canvas.close", async (params) => {
+    const handler = getHandlers(params.sessionId).canvas;
+    if (!handler) throw new Error(`No canvas handler registered for session: ${params.sessionId}`);
+    return handler.close(params);
+  });
+  connection.onRequest("canvas.invokeAction", async (params) => {
+    const handler = getHandlers(params.sessionId).canvas;
+    if (!handler) throw new Error(`No canvas handler registered for session: ${params.sessionId}`);
+    return handler.invokeAction(params);
+  });
 }
 
 // node_modules/@github/copilot-sdk/dist/sdkProtocolVersion.js
@@ -3468,6 +4788,22 @@ function getSdkProtocolVersion() {
 
 // node_modules/@github/copilot-sdk/dist/session.js
 var import_node = __toESM(require_node(), 1);
+
+// node_modules/@github/copilot-sdk/dist/canvas.js
+var CanvasError = class _CanvasError extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+    this.name = "CanvasError";
+  }
+  /** Default error when an action is declared but no `handler` is wired. */
+  static noHandler() {
+    return new _CanvasError(
+      "canvas_action_no_handler",
+      "No handler implemented for this canvas action"
+    );
+  }
+};
 
 // node_modules/@github/copilot-sdk/dist/telemetry.js
 async function getTraceContext(provider) {
@@ -3480,7 +4816,14 @@ async function getTraceContext(provider) {
 }
 
 // node_modules/@github/copilot-sdk/dist/session.js
-var NO_RESULT_PERMISSION_V2_ERROR = "Permission handlers cannot return 'no-result' when connected to a protocol v2 server.";
+function deserializeHookInput(raw) {
+  if (!raw || typeof raw !== "object" || typeof raw.timestamp !== "number") {
+    return raw;
+  }
+  const obj = raw;
+  const { cwd, ...rest } = obj;
+  return { ...rest, timestamp: new Date(obj.timestamp), workingDirectory: cwd };
+}
 var CopilotSession = class {
   /**
    * Creates a new CopilotSession instance.
@@ -3500,15 +4843,19 @@ var CopilotSession = class {
   eventHandlers = /* @__PURE__ */ new Set();
   typedEventHandlers = /* @__PURE__ */ new Map();
   toolHandlers = /* @__PURE__ */ new Map();
+  canvases = /* @__PURE__ */ new Map();
   commandHandlers = /* @__PURE__ */ new Map();
   permissionHandler;
   userInputHandler;
   elicitationHandler;
+  exitPlanModeHandler;
+  autoModeSwitchHandler;
   hooks;
   transformCallbacks;
   _rpc = null;
   traceContextProvider;
   _capabilities = {};
+  openCanvasInstances = [];
   /** @internal Client session API handlers, populated by CopilotClient during create/resume. */
   clientSessionApis = {};
   /**
@@ -3555,58 +4902,21 @@ var CopilotSession = class {
       input: (message, options) => this._input(message, options)
     };
   }
-  /**
-   * Sends a message to this session and waits for the response.
-   *
-   * The message is processed asynchronously. Subscribe to events via {@link on}
-   * to receive streaming responses and other session events.
-   *
-   * @param options - The message options including the prompt and optional attachments
-   * @returns A promise that resolves with the message ID of the response
-   * @throws Error if the session has been disconnected or the connection fails
-   *
-   * @example
-   * ```typescript
-   * const messageId = await session.send({
-   *   prompt: "Explain this code",
-   *   attachments: [{ type: "file", path: "./src/index.ts" }]
-   * });
-   * ```
-   */
-  async send(options) {
+  async send(optionsOrPrompt) {
+    const options = typeof optionsOrPrompt === "string" ? { prompt: optionsOrPrompt } : optionsOrPrompt;
     const response = await this.connection.sendRequest("session.send", {
       ...await getTraceContext(this.traceContextProvider),
       sessionId: this.sessionId,
       prompt: options.prompt,
       attachments: options.attachments,
-      mode: options.mode
+      mode: options.mode,
+      agentMode: options.agentMode,
+      requestHeaders: options.requestHeaders
     });
     return response.messageId;
   }
-  /**
-   * Sends a message to this session and waits until the session becomes idle.
-   *
-   * This is a convenience method that combines {@link send} with waiting for
-   * the `session.idle` event. Use this when you want to block until the
-   * assistant has finished processing the message.
-   *
-   * Events are still delivered to handlers registered via {@link on} while waiting.
-   *
-   * @param options - The message options including the prompt and optional attachments
-   * @param timeout - Timeout in milliseconds (default: 60000). Controls how long to wait; does not abort in-flight agent work.
-   * @returns A promise that resolves with the final assistant message when the session becomes idle,
-   *          or undefined if no assistant message was received
-   * @throws Error if the timeout is reached before the session becomes idle
-   * @throws Error if the session has been disconnected or the connection fails
-   *
-   * @example
-   * ```typescript
-   * // Send and wait for completion with default 60s timeout
-   * const response = await session.sendAndWait({ prompt: "What is 2+2?" });
-   * console.log(response?.data.content); // "4"
-   * ```
-   */
-  async sendAndWait(options, timeout) {
+  async sendAndWait(optionsOrPrompt, timeout) {
+    const options = typeof optionsOrPrompt === "string" ? { prompt: optionsOrPrompt } : optionsOrPrompt;
     const effectiveTimeout = timeout ?? 6e4;
     let resolveIdle;
     let rejectWithError;
@@ -3803,7 +5113,7 @@ var CopilotSession = class {
         await this.rpc.permissions.handlePendingPermissionRequest({
           requestId,
           result: {
-            kind: "denied-no-approval-rule-and-could-not-request-from-user"
+            kind: "user-not-available"
           }
         });
       } catch (rpcError) {
@@ -3849,8 +5159,8 @@ var CopilotSession = class {
   /**
    * Registers custom tool handlers for this session.
    *
-   * Tools allow the assistant to execute custom functions. When the assistant
-   * invokes a tool, the corresponding handler is called with the tool arguments.
+   * Tools with handlers allow the assistant to execute custom functions automatically.
+   * Declaration-only tools are surfaced as events and left pending for the consumer.
    *
    * @param tools - An array of tool definitions with their handlers, or undefined to clear all tools
    * @internal This method is typically called internally when creating a session with tools.
@@ -3861,7 +5171,9 @@ var CopilotSession = class {
       return;
     }
     for (const tool of tools) {
-      this.toolHandlers.set(tool.name, tool.handler);
+      if (tool.handler) {
+        this.toolHandlers.set(tool.name, tool.handler);
+      }
     }
   }
   /**
@@ -3873,6 +5185,61 @@ var CopilotSession = class {
    */
   getToolHandler(name) {
     return this.toolHandlers.get(name);
+  }
+  /**
+   * Registers canvas declarations and handlers for this session.
+   *
+   * @param canvases - Canvases created via `createCanvas`, or undefined to clear all canvases
+   * @internal Called by the SDK when creating/resuming a session with `canvases`.
+   */
+  registerCanvases(canvases) {
+    this.canvases.clear();
+    if (!canvases || canvases.length === 0) {
+      delete this.clientSessionApis.canvas;
+      return;
+    }
+    for (const canvas of canvases) {
+      this.canvases.set(canvas.declaration.id, canvas);
+    }
+    const self = this;
+    this.clientSessionApis.canvas = {
+      async open(params) {
+        const canvas = self.canvases.get(params.canvasId);
+        if (!canvas) throw new Error(`No canvas registered with id "${params.canvasId}"`);
+        try {
+          return await canvas.open(params) ?? {};
+        } catch (error) {
+          throw toCanvasRpcError(error);
+        }
+      },
+      async close(params) {
+        const canvas = self.canvases.get(params.canvasId);
+        if (!canvas) throw new Error(`No canvas registered with id "${params.canvasId}"`);
+        try {
+          if (canvas.onClose) {
+            await canvas.onClose(params);
+          }
+        } catch (error) {
+          throw toCanvasRpcError(error);
+        }
+      },
+      async invokeAction(params) {
+        const canvas = self.canvases.get(params.canvasId);
+        if (!canvas) throw new Error(`No canvas registered with id "${params.canvasId}"`);
+        const handler = canvas.actionHandlers.get(params.actionName);
+        if (!handler) {
+          throw new CanvasError(
+            "canvas_action_no_handler",
+            "No handler implemented for this canvas action"
+          );
+        }
+        try {
+          return await handler(params);
+        } catch (error) {
+          throw toCanvasRpcError(error);
+        }
+      }
+    };
   }
   /**
    * Registers command handlers for this session.
@@ -3897,6 +5264,24 @@ var CopilotSession = class {
    */
   registerElicitationHandler(handler) {
     this.elicitationHandler = handler;
+  }
+  /**
+   * Registers the exit-plan-mode handler for this session.
+   *
+   * @param handler - The handler to invoke when the server dispatches an exit-plan-mode request
+   * @internal This method is typically called internally when creating/resuming a session.
+   */
+  registerExitPlanModeHandler(handler) {
+    this.exitPlanModeHandler = handler;
+  }
+  /**
+   * Registers the auto-mode-switch handler for this session.
+   *
+   * @param handler - The handler to invoke when the server dispatches an auto-mode-switch request
+   * @internal This method is typically called internally when creating/resuming a session.
+   */
+  registerAutoModeSwitchHandler(handler) {
+    this.autoModeSwitchHandler = handler;
   }
   /**
    * Handles an elicitation.requested broadcast event.
@@ -3924,6 +5309,26 @@ var CopilotSession = class {
     }
   }
   /**
+   * Handles an exitPlanMode.request callback from the runtime.
+   * @internal
+   */
+  async _handleExitPlanModeRequest(request) {
+    if (!this.exitPlanModeHandler) {
+      return { approved: true };
+    }
+    return await this.exitPlanModeHandler(request, { sessionId: this.sessionId });
+  }
+  /**
+   * Handles an autoModeSwitch.request callback from the runtime.
+   * @internal
+   */
+  async _handleAutoModeSwitchRequest(request) {
+    if (!this.autoModeSwitchHandler) {
+      return "no";
+    }
+    return await this.autoModeSwitchHandler(request, { sessionId: this.sessionId });
+  }
+  /**
    * Sets the host capabilities for this session.
    *
    * @param capabilities - The capabilities object from the create/resume response
@@ -3931,6 +5336,24 @@ var CopilotSession = class {
    */
   setCapabilities(capabilities) {
     this._capabilities = capabilities ?? {};
+  }
+  /**
+   * Snapshot of canvas instances that were already open when the session was
+   * resumed. Populated from the `session.resume` response; empty for freshly
+   * created sessions. Returns a defensive copy — mutating the returned array
+   * has no effect on the session.
+   */
+  get openCanvases() {
+    return [...this.openCanvasInstances];
+  }
+  /**
+   * Sets the open-canvas snapshot for this session.
+   *
+   * @param instances - The `openCanvases` array from the `session.resume` response.
+   * @internal This method is typically called internally when resuming a session.
+   */
+  setOpenCanvases(instances) {
+    this.openCanvasInstances = [...instances];
   }
   assertElicitation() {
     if (!this._capabilities.ui?.elicitation) {
@@ -4072,33 +5495,6 @@ var CopilotSession = class {
     return { sections: result };
   }
   /**
-   * Handles a permission request in the v2 protocol format (synchronous RPC).
-   * Used as a back-compat adapter when connected to a v2 server.
-   *
-   * @param request - The permission request data from the CLI
-   * @returns A promise that resolves with the permission decision
-   * @internal This method is for internal use by the SDK.
-   */
-  async _handlePermissionRequestV2(request) {
-    if (!this.permissionHandler) {
-      return { kind: "denied-no-approval-rule-and-could-not-request-from-user" };
-    }
-    try {
-      const result = await this.permissionHandler(request, {
-        sessionId: this.sessionId
-      });
-      if (result.kind === "no-result") {
-        throw new Error(NO_RESULT_PERMISSION_V2_ERROR);
-      }
-      return result;
-    } catch (error) {
-      if (error instanceof Error && error.message === NO_RESULT_PERMISSION_V2_ERROR) {
-        throw error;
-      }
-      return { kind: "denied-no-approval-rule-and-could-not-request-from-user" };
-    }
-  }
-  /**
    * Handles a user input request from the Copilot CLI.
    *
    * @param request - The user input request data from the CLI
@@ -4130,9 +5526,12 @@ var CopilotSession = class {
     if (!this.hooks) {
       return void 0;
     }
+    const normalized = deserializeHookInput(input);
     const handlerMap = {
       preToolUse: this.hooks.onPreToolUse,
+      preMcpToolCall: this.hooks.onPreMcpToolCall,
       postToolUse: this.hooks.onPostToolUse,
+      postToolUseFailure: this.hooks.onPostToolUseFailure,
       userPromptSubmitted: this.hooks.onUserPromptSubmitted,
       sessionStart: this.hooks.onSessionStart,
       sessionEnd: this.hooks.onSessionEnd,
@@ -4143,7 +5542,7 @@ var CopilotSession = class {
       return void 0;
     }
     try {
-      const result = await handler(input, { sessionId: this.sessionId });
+      const result = await handler(normalized, { sessionId: this.sessionId });
       return result;
     } catch (_error) {
       return void 0;
@@ -4160,7 +5559,7 @@ var CopilotSession = class {
    *
    * @example
    * ```typescript
-   * const events = await session.getMessages();
+   * const events = await session.getEvents();
    * for (const event of events) {
    *   if (event.type === "assistant.message") {
    *     console.log("Assistant:", event.data.content);
@@ -4168,7 +5567,7 @@ var CopilotSession = class {
    * }
    * ```
    */
-  async getMessages() {
+  async getEvents() {
     const response = await this.connection.sendRequest("session.getMessages", {
       sessionId: this.sessionId
     });
@@ -4203,18 +5602,10 @@ var CopilotSession = class {
     this.typedEventHandlers.clear();
     this.toolHandlers.clear();
     this.permissionHandler = void 0;
-  }
-  /**
-   * @deprecated Use {@link disconnect} instead. This method will be removed in a future release.
-   *
-   * Disconnects this session and releases all in-memory resources.
-   * Session data on disk is preserved for later resumption.
-   *
-   * @returns A promise that resolves when the session is disconnected
-   * @throws Error if the connection fails
-   */
-  async destroy() {
-    return this.disconnect();
+    this.userInputHandler = void 0;
+    this.elicitationHandler = void 0;
+    this.exitPlanModeHandler = void 0;
+    this.autoModeSwitchHandler = void 0;
   }
   /** Enables `await using session = ...` syntax for automatic cleanup. */
   async [Symbol.asyncDispose]() {
@@ -4300,10 +5691,206 @@ function isToolResultObject(value) {
   ];
   return allowedResultTypes.includes(value.resultType);
 }
+function toCanvasRpcError(error) {
+  if (error instanceof import_node.ResponseError) return error;
+  const code = error instanceof CanvasError ? error.code : "canvas_handler_error";
+  const message = error instanceof Error ? error.message : String(error);
+  return new import_node.ResponseError(import_node.ErrorCodes.InternalError, message, { code, message });
+}
+
+// node_modules/@github/copilot-sdk/dist/sessionFsProvider.js
+function normalizeSqliteParams(params) {
+  if (!params) {
+    return void 0;
+  }
+  const normalized = {};
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== void 0) {
+      normalized[key] = value;
+    }
+  }
+  return normalized;
+}
+function createSessionFsAdapter(provider) {
+  return {
+    readFile: async ({ path }) => {
+      try {
+        const content = await provider.readFile(path);
+        return { content };
+      } catch (err) {
+        return { content: "", error: toSessionFsError(err) };
+      }
+    },
+    writeFile: async ({ path, content, mode }) => {
+      try {
+        await provider.writeFile(path, content, mode);
+        return void 0;
+      } catch (err) {
+        return toSessionFsError(err);
+      }
+    },
+    appendFile: async ({ path, content, mode }) => {
+      try {
+        await provider.appendFile(path, content, mode);
+        return void 0;
+      } catch (err) {
+        return toSessionFsError(err);
+      }
+    },
+    exists: async ({ path }) => {
+      try {
+        return { exists: await provider.exists(path) };
+      } catch {
+        return { exists: false };
+      }
+    },
+    stat: async ({ path }) => {
+      try {
+        return await provider.stat(path);
+      } catch (err) {
+        return {
+          isFile: false,
+          isDirectory: false,
+          size: 0,
+          mtime: (/* @__PURE__ */ new Date()).toISOString(),
+          birthtime: (/* @__PURE__ */ new Date()).toISOString(),
+          error: toSessionFsError(err)
+        };
+      }
+    },
+    mkdir: async ({ path, recursive, mode }) => {
+      try {
+        await provider.mkdir(path, recursive ?? false, mode);
+        return void 0;
+      } catch (err) {
+        return toSessionFsError(err);
+      }
+    },
+    readdir: async ({ path }) => {
+      try {
+        const entries = await provider.readdir(path);
+        return { entries };
+      } catch (err) {
+        return { entries: [], error: toSessionFsError(err) };
+      }
+    },
+    readdirWithTypes: async ({ path }) => {
+      try {
+        const entries = await provider.readdirWithTypes(path);
+        return { entries };
+      } catch (err) {
+        return { entries: [], error: toSessionFsError(err) };
+      }
+    },
+    rm: async ({ path, recursive, force }) => {
+      try {
+        await provider.rm(path, recursive ?? false, force ?? false);
+        return void 0;
+      } catch (err) {
+        return toSessionFsError(err);
+      }
+    },
+    rename: async ({ src, dest }) => {
+      try {
+        await provider.rename(src, dest);
+        return void 0;
+      } catch (err) {
+        return toSessionFsError(err);
+      }
+    },
+    // Unlike the FS methods above, SQLite methods let errors propagate to the JSON-RPC layer
+    // rather than catching and mapping via toSessionFsError. The FS error mapping is specifically
+    // for translating Node.js errno codes (e.g., ENOENT) into SessionFsError, which isn't
+    // meaningful for SQL errors. Letting exceptions propagate preserves the original error
+    // message in the JSON-RPC error response.
+    sqliteQuery: async ({ queryType, query, params: bindParams }) => {
+      if (!provider.sqlite) {
+        throw new Error("SQLite is not supported by this provider");
+      }
+      const result = await provider.sqlite.query(
+        queryType,
+        query,
+        normalizeSqliteParams(bindParams)
+      );
+      return result ?? { rows: [], columns: [], rowsAffected: 0 };
+    },
+    sqliteExists: async () => {
+      if (!provider.sqlite) {
+        throw new Error("SQLite is not supported by this provider");
+      }
+      return { exists: await provider.sqlite.exists() };
+    }
+  };
+}
+function toSessionFsError(err) {
+  const e = err;
+  const code = e.code === "ENOENT" ? "ENOENT" : "UNKNOWN";
+  return { code, message: e.message ?? String(err) };
+}
+
+// node_modules/@github/copilot-sdk/dist/toolSet.js
+var VALID_TOOL_NAME = /^[a-zA-Z0-9_-]+$/;
+function validateName(kind, name) {
+  if (name === "*") {
+    return;
+  }
+  if (!VALID_TOOL_NAME.test(name)) {
+    throw new Error(
+      `Invalid ${kind} tool name '${name}': tool names must match /^[a-zA-Z0-9_-]+$/ or be the wildcard '*'.`
+    );
+  }
+}
+var ToolSet = class {
+  items = [];
+  addBuiltIn(nameOrNames) {
+    const names = typeof nameOrNames === "string" ? [nameOrNames] : nameOrNames;
+    for (const name of names) {
+      validateName("builtin", name);
+      this.items.push(`builtin:${name}`);
+    }
+    return this;
+  }
+  /**
+   * Adds a custom tool pattern. Matches tools registered via the SDK's
+   * `tools` option or via custom agents.
+   *
+   * @param name A specific custom tool name or `"*"` to match all custom tools.
+   */
+  addCustom(name) {
+    validateName("custom", name);
+    this.items.push(`custom:${name}`);
+    return this;
+  }
+  /**
+   * Adds an MCP tool pattern. Matches tools advertised by any configured
+   * MCP server.
+   *
+   * @param toolName The runtime's canonical wire name for the MCP tool
+   *   (e.g. `"github-list_issues"`), or `"*"` to match all MCP tools from
+   *   any server.
+   */
+  addMcp(toolName) {
+    validateName("mcp", toolName);
+    this.items.push(`mcp:${toolName}`);
+    return this;
+  }
+  /**
+   * Returns a defensive copy of the accumulated filter strings, suitable for
+   * passing as {@link SessionConfigBase.availableTools}.
+   */
+  toArray() {
+    return [...this.items];
+  }
+};
+
+// node_modules/@github/copilot-sdk/dist/types.js
+var defaultJoinSessionPermissionHandler = () => ({
+  kind: "no-result"
+});
 
 // node_modules/@github/copilot-sdk/dist/client.js
 var import_meta = {};
-var MIN_PROTOCOL_VERSION = 2;
+var MIN_PROTOCOL_VERSION = 3;
 function isZodSchema(value) {
   return value != null && typeof value === "object" && "toJSONSchema" in value && typeof value.toJSONSchema === "function";
 }
@@ -4313,6 +5900,44 @@ function toJsonSchema(parameters) {
     return parameters.toJSONSchema();
   }
   return parameters;
+}
+function toWireMcpServers(mcpServers) {
+  if (!mcpServers) return void 0;
+  return Object.fromEntries(
+    Object.entries(mcpServers).map(([name, server]) => {
+      if ("workingDirectory" in server) {
+        const { workingDirectory, ...rest } = server;
+        return [name, { ...rest, cwd: workingDirectory }];
+      }
+      return [name, server];
+    })
+  );
+}
+function toWireCustomAgents(agents) {
+  if (!agents) return void 0;
+  return agents.map((agent) => {
+    if (!agent.mcpServers) return agent;
+    const { mcpServers, ...rest } = agent;
+    return { ...rest, mcpServers: toWireMcpServers(mcpServers) };
+  });
+}
+function toolFilterListToArray(value) {
+  if (value === void 0) {
+    return void 0;
+  }
+  return value instanceof ToolSet ? value.toArray() : value;
+}
+function validateToolFilterList(field, list) {
+  if (!list) {
+    return;
+  }
+  for (const entry of list) {
+    if (entry === "*") {
+      throw new Error(
+        `Invalid ${field} entry '*': there is no bare wildcard. Use one or more of \`new ToolSet().addBuiltIn('*')\`, \`.addMcp('*')\`, or \`.addCustom('*')\` to target a specific source.`
+      );
+    }
+  }
 }
 function extractTransformCallbacks(systemMessage) {
   if (!systemMessage || systemMessage.mode !== "customize" || !systemMessage.sections) {
@@ -4363,18 +5988,27 @@ function getBundledCliPath() {
   );
 }
 var CopilotClient = class _CopilotClient {
+  cliStartTimeout = null;
   cliProcess = null;
   connection = null;
   socket = null;
-  actualPort = null;
+  runtimePort = null;
   actualHost = "localhost";
   state = "disconnected";
   sessions = /* @__PURE__ */ new Map();
   stderrBuffer = "";
   // Captures CLI stderr for error messages
+  /** Resolved connection mode chosen in the constructor. */
+  connectionConfig;
+  /** Resolved path to the runtime executable (only used for child-process kinds). */
+  resolvedCliPath;
+  /** Resolved environment passed to the spawned runtime. */
+  resolvedEnv;
   options;
   isExternalServer = false;
   forceStopping = false;
+  /** Token sent in `connect`; auto-generated when the SDK spawns its own CLI in TCP mode. */
+  effectiveConnectionToken;
   onListModels;
   onGetTraceContext;
   modelsCache = null;
@@ -4382,6 +6016,7 @@ var CopilotClient = class _CopilotClient {
   sessionLifecycleHandlers = /* @__PURE__ */ new Set();
   typedLifecycleHandlers = /* @__PURE__ */ new Map();
   _rpc = null;
+  _internalRpc = null;
   processExitPromise = null;
   // Rejects when CLI process exits
   negotiatedProtocolVersion = null;
@@ -4401,75 +6036,106 @@ var CopilotClient = class _CopilotClient {
     return this._rpc;
   }
   /**
+   * Internal RPC surface (e.g. handshake helpers). Not part of the public API.
+   * @internal
+   */
+  get internalRpc() {
+    if (!this.connection) {
+      throw new Error("Client is not connected. Call start() first.");
+    }
+    if (!this._internalRpc) {
+      this._internalRpc = createInternalServerRpc(this.connection);
+    }
+    return this._internalRpc;
+  }
+  /**
    * Creates a new CopilotClient instance.
    *
    * @param options - Configuration options for the client
-   * @throws Error if mutually exclusive options are provided (e.g., cliUrl with useStdio or cliPath)
    *
    * @example
    * ```typescript
-   * // Default options - spawns CLI server using stdio
+   * // Default: spawns the bundled runtime over stdio
    * const client = new CopilotClient();
    *
-   * // Connect to an existing server
-   * const client = new CopilotClient({ cliUrl: "localhost:3000" });
-   *
-   * // Custom CLI path with specific log level
+   * // Connect to an existing runtime
    * const client = new CopilotClient({
-   *   cliPath: "/usr/local/bin/copilot",
-   *   logLevel: "debug"
+   *   connection: RuntimeConnection.forUri("localhost:3000"),
+   * });
+   *
+   * // Spawn the runtime over TCP on a chosen port
+   * const client = new CopilotClient({
+   *   connection: RuntimeConnection.forTcp({ port: 9001 }),
+   * });
+   *
+   * // Use a custom runtime binary
+   * const client = new CopilotClient({
+   *   connection: RuntimeConnection.forStdio({ path: "/usr/local/bin/copilot" }),
+   *   logLevel: "debug",
    * });
    * ```
    */
   constructor(options = {}) {
-    if (options.cliUrl && (options.useStdio === true || options.cliPath)) {
-      throw new Error("cliUrl is mutually exclusive with useStdio and cliPath");
-    }
-    if (options.isChildProcess && (options.cliUrl || options.useStdio === false)) {
+    const conn = options._internalConnection ?? options.connection ?? { kind: "stdio" };
+    if (conn.kind === "uri" && (options.gitHubToken !== void 0 || options.useLoggedInUser !== void 0)) {
       throw new Error(
-        "isChildProcess must be used in conjunction with useStdio and not with cliUrl"
+        "gitHubToken and useLoggedInUser cannot be used with RuntimeConnection.forUri (external server manages its own auth)"
       );
     }
-    if (options.cliUrl && (options.githubToken || options.useLoggedInUser !== void 0)) {
-      throw new Error(
-        "githubToken and useLoggedInUser cannot be used with cliUrl (external server manages its own auth)"
-      );
+    if (conn.kind === "tcp" && conn.connectionToken !== void 0) {
+      if (typeof conn.connectionToken !== "string" || conn.connectionToken.length === 0) {
+        throw new Error("connectionToken must be a non-empty string");
+      }
     }
+    this.connectionConfig = conn;
     if (options.sessionFs) {
       this.validateSessionFsConfig(options.sessionFs);
     }
-    if (options.cliUrl) {
-      const { host, port } = this.parseCliUrl(options.cliUrl);
+    if (conn.kind === "uri") {
+      const { host, port } = this.parseCliUrl(conn.url);
       this.actualHost = host;
-      this.actualPort = port;
+      this.runtimePort = port;
+      this.isExternalServer = true;
+    } else if (conn.kind === "parent-process") {
       this.isExternalServer = true;
     }
-    if (options.isChildProcess) {
-      this.isExternalServer = true;
+    if (conn.kind === "tcp") {
+      this.effectiveConnectionToken = conn.connectionToken ?? (0, import_node_crypto.randomUUID)();
+    } else if (conn.kind === "uri") {
+      this.effectiveConnectionToken = conn.connectionToken;
     }
     this.onListModels = options.onListModels;
     this.onGetTraceContext = options.onGetTraceContext;
     this.sessionFsConfig = options.sessionFs ?? null;
     const effectiveEnv = options.env ?? process.env;
+    this.resolvedEnv = effectiveEnv;
+    this.resolvedCliPath = conn.kind === "stdio" || conn.kind === "tcp" ? conn.path ?? effectiveEnv.COPILOT_CLI_PATH ?? getBundledCliPath() : void 0;
+    const connArgs = conn.kind === "stdio" || conn.kind === "tcp" ? conn.args ?? [] : [];
+    this.connectionExtraArgs = [...connArgs];
     this.options = {
-      cliPath: options.cliUrl ? void 0 : options.cliPath || effectiveEnv.COPILOT_CLI_PATH || getBundledCliPath(),
-      cliArgs: options.cliArgs ?? [],
-      cwd: options.cwd ?? process.cwd(),
-      port: options.port || 0,
-      useStdio: options.cliUrl ? false : options.useStdio ?? true,
-      // Default to stdio unless cliUrl is provided
-      isChildProcess: options.isChildProcess ?? false,
-      cliUrl: options.cliUrl,
-      logLevel: options.logLevel || "debug",
-      autoStart: options.autoStart ?? true,
-      autoRestart: false,
-      env: effectiveEnv,
-      githubToken: options.githubToken,
-      // Default useLoggedInUser to false when githubToken is provided, otherwise true
-      useLoggedInUser: options.useLoggedInUser ?? (options.githubToken ? false : true),
-      telemetry: options.telemetry
+      workingDirectory: options.workingDirectory ?? process.cwd(),
+      logLevel: options.logLevel,
+      gitHubToken: options.gitHubToken,
+      // Default useLoggedInUser to false when gitHubToken is provided, otherwise true.
+      useLoggedInUser: options.useLoggedInUser ?? (options.gitHubToken ? false : true),
+      telemetry: options.telemetry,
+      baseDirectory: options.baseDirectory,
+      sessionIdleTimeoutSeconds: options.sessionIdleTimeoutSeconds ?? 0,
+      enableRemoteSessions: options.enableRemoteSessions ?? false,
+      mode: options.mode ?? "copilot-cli"
     };
+    if (this.options.mode === "empty") {
+      const hasPersistence = this.options.baseDirectory !== void 0 || this.sessionFsConfig !== null || // External runtimes manage their own persistence layer; the SDK
+      // can't enforce it from here.
+      conn.kind === "uri" || conn.kind === "parent-process";
+      if (!hasPersistence) {
+        throw new Error(
+          "CopilotClient was created with mode: 'empty' but neither 'baseDirectory' nor 'sessionFs' was set. Empty mode requires an explicit per-session persistence location; pick one."
+        );
+      }
+    }
   }
+  connectionExtraArgs = [];
   /**
    * Parse CLI URL into host and port
    * Supports formats: "host:port", "http://host:port", "https://host:port", or just "port"
@@ -4503,20 +6169,37 @@ var CopilotClient = class _CopilotClient {
       throw new Error("sessionFs.conventions must be either 'windows' or 'posix'");
     }
   }
+  setupSessionFs(session, config) {
+    if (!this.sessionFsConfig) {
+      return;
+    }
+    if (!config.createSessionFsProvider) {
+      throw new Error(
+        "createSessionFsProvider is required in session config when sessionFs is enabled in client options."
+      );
+    }
+    const provider = config.createSessionFsProvider(session);
+    if (this.sessionFsConfig.capabilities?.sqlite && !provider.sqlite) {
+      throw new Error(
+        "SessionFsConfig declares capabilities.sqlite but the provider does not implement sqlite."
+      );
+    }
+    session.clientSessionApis.sessionFs = createSessionFsAdapter(provider);
+  }
   /**
    * Starts the CLI server and establishes a connection.
    *
    * If connecting to an external server (via cliUrl), only establishes the connection.
    * Otherwise, spawns the CLI server process and then connects.
    *
-   * This method is called automatically when creating a session if `autoStart` is true (default).
+   * This method is called automatically the first time you create or resume a session.
    *
    * @returns A promise that resolves when the connection is established
    * @throws Error if the server fails to start or the connection fails
    *
    * @example
    * ```typescript
-   * const client = new CopilotClient({ autoStart: false });
+   * const client = new CopilotClient();
    * await client.start();
    * // Now ready to create sessions
    * ```
@@ -4536,7 +6219,8 @@ var CopilotClient = class _CopilotClient {
         await this.connection.sendRequest("sessionFs.setProvider", {
           initialCwd: this.sessionFsConfig.initialCwd,
           sessionStatePath: this.sessionFsConfig.sessionStatePath,
-          conventions: this.sessionFsConfig.conventions
+          conventions: this.sessionFsConfig.conventions,
+          capabilities: this.sessionFsConfig.capabilities
         });
       }
       this.state = "connected";
@@ -4610,8 +6294,15 @@ var CopilotClient = class _CopilotClient {
     }
     this.modelsCache = null;
     if (this.socket) {
+      const socket = this.socket;
+      this.socket = null;
       try {
-        this.socket.end();
+        if (!socket.destroyed) {
+          await new Promise((resolve4) => {
+            socket.once("close", () => resolve4());
+            socket.end();
+          });
+        }
       } catch (error) {
         errors.push(
           new Error(
@@ -4619,11 +6310,18 @@ var CopilotClient = class _CopilotClient {
           )
         );
       }
-      this.socket = null;
     }
     if (this.cliProcess && !this.isExternalServer) {
+      const child = this.cliProcess;
+      this.cliProcess = null;
       try {
-        this.cliProcess.kill();
+        if (child.exitCode === null && child.signalCode === null) {
+          const exited = new Promise((resolve4) => {
+            child.once("exit", () => resolve4());
+          });
+          child.kill();
+          await exited;
+        }
       } catch (error) {
         errors.push(
           new Error(
@@ -4631,13 +6329,31 @@ var CopilotClient = class _CopilotClient {
           )
         );
       }
-      this.cliProcess = null;
+    }
+    if (this.cliStartTimeout) {
+      clearTimeout(this.cliStartTimeout);
+      this.cliStartTimeout = null;
     }
     this.state = "disconnected";
-    this.actualPort = null;
+    this.runtimePort = null;
     this.stderrBuffer = "";
     this.processExitPromise = null;
     return errors;
+  }
+  /**
+   * Alias for {@link stop} that lets `CopilotClient` participate in `await using`
+   * blocks for automatic cleanup.
+   *
+   * @example
+   * ```typescript
+   * await using client = new CopilotClient();
+   * const session = await client.createSession({ onPermissionRequest: approveAll });
+   * await session.sendAndWait("Hello");
+   * // client.stop() is called automatically when the block exits.
+   * ```
+   */
+  async [Symbol.asyncDispose]() {
+    await this.stop();
   }
   /**
    * Forcefully stops the CLI server without graceful cleanup.
@@ -4690,8 +6406,12 @@ var CopilotClient = class _CopilotClient {
       }
       this.cliProcess = null;
     }
+    if (this.cliStartTimeout) {
+      clearTimeout(this.cliStartTimeout);
+      this.cliStartTimeout = null;
+    }
     this.state = "disconnected";
-    this.actualPort = null;
+    this.runtimePort = null;
     this.stderrBuffer = "";
     this.processExitPromise = null;
   }
@@ -4699,12 +6419,11 @@ var CopilotClient = class _CopilotClient {
    * Creates a new conversation session with the Copilot CLI.
    *
    * Sessions maintain conversation state, handle events, and manage tool execution.
-   * If the client is not connected and `autoStart` is enabled, this will automatically
-   * start the connection.
+   * If the client is not connected, this method automatically starts the connection.
    *
    * @param config - Optional configuration for the session
    * @returns A promise that resolves with the created session
-   * @throws Error if the client is not connected and autoStart is disabled
+   * @throws Error if the client fails to start
    *
    * @example
    * ```typescript
@@ -4724,19 +6443,122 @@ var CopilotClient = class _CopilotClient {
    * });
    * ```
    */
-  async createSession(config) {
-    if (!config?.onPermissionRequest) {
-      throw new Error(
-        "An onPermissionRequest handler is required when creating a session. For example, to allow all permissions, use { onPermissionRequest: approveAll }."
-      );
-    }
-    if (!this.connection) {
-      if (this.options.autoStart) {
-        await this.start();
-      } else {
-        throw new Error("Client not connected. Call start() first.");
+  /**
+   * Normalizes session-level tool filter options. Converts {@link ToolSet}
+   * instances to plain string arrays, rejects misuse (bare `"*"`) and the
+   * missing-availableTools case in `mode = "empty"`.
+   *
+   * The SDK always sends `toolFilterPrecedence: "excluded"` so callers can
+   * compose include + exclude lists naturally (e.g. "everything matching X
+   * except Y") regardless of mode. Allowlist-precedence is intentionally not
+   * exposed — it's available on the runtime side as a CLI-only concession to
+   * legacy behavior, but SDK consumers always get the composable semantics.
+   *
+   * @internal
+   */
+  resolveToolFilterOptions(config) {
+    const availableTools = toolFilterListToArray(config.availableTools);
+    const excludedTools = toolFilterListToArray(config.excludedTools);
+    validateToolFilterList("availableTools", availableTools);
+    validateToolFilterList("excludedTools", excludedTools);
+    if (this.options.mode === "empty") {
+      if (availableTools === void 0) {
+        throw new Error(
+          "CopilotClient is in mode: 'empty' but the session config did not specify 'availableTools'. Empty mode requires every session to explicitly opt into the tools it wants \u2014 e.g. `new ToolSet().addBuiltIn(BuiltInTools.Isolated)`."
+        );
       }
     }
+    return { availableTools, excludedTools, toolFilterPrecedence: "excluded" };
+  }
+  /** Mode-specific defaults spread under the caller's config (app values win). */
+  configDefaultsForMode() {
+    if (this.options.mode === "empty") {
+      return { enableSessionTelemetry: false };
+    }
+    return {};
+  }
+  /**
+   * Returns the systemMessage config to use, adjusted for the current mode.
+   * In empty mode we ensure the environment_context section is removed
+   * unless the app has already taken control of it. `append` (and
+   * unspecified) mode is promoted to `customize` so we can also strip
+   * environment_context; the caller's `content` is preserved verbatim
+   * because the runtime appends it as additional instructions in both
+   * customize and append modes.
+   */
+  getSystemMessageConfigForMode(supplied) {
+    if (this.options.mode !== "empty") return supplied;
+    if (!supplied) {
+      return {
+        mode: "customize",
+        sections: { environment_context: { action: "remove" } }
+      };
+    }
+    switch (supplied.mode) {
+      case "replace":
+        return supplied;
+      case "customize":
+        if (supplied.sections?.environment_context) return supplied;
+        return {
+          ...supplied,
+          sections: {
+            ...supplied.sections,
+            environment_context: { action: "remove" }
+          }
+        };
+      case "append":
+      case void 0:
+        return {
+          mode: "customize",
+          content: supplied.content,
+          sections: { environment_context: { action: "remove" } }
+        };
+    }
+  }
+  /**
+   * Mode-specific options applied via session.options.update after create/resume.
+   *
+   * In empty mode, defaults the four overridable feature flags to safe values
+   * (caller values from `config` win). `installedPlugins=[]` is unconditional
+   * in empty mode — apps that need custom plugins should switch modes.
+   */
+  async updateSessionOptionsForMode(session, config) {
+    const patch = {};
+    if (this.options.mode === "empty") {
+      patch.skipCustomInstructions = config.skipCustomInstructions ?? true;
+      patch.customAgentsLocalOnly = config.customAgentsLocalOnly ?? true;
+      patch.coauthorEnabled = config.coauthorEnabled ?? false;
+      patch.manageScheduleEnabled = config.manageScheduleEnabled ?? false;
+      patch.installedPlugins = [];
+    } else {
+      if (config.skipCustomInstructions !== void 0)
+        patch.skipCustomInstructions = config.skipCustomInstructions;
+      if (config.customAgentsLocalOnly !== void 0)
+        patch.customAgentsLocalOnly = config.customAgentsLocalOnly;
+      if (config.coauthorEnabled !== void 0)
+        patch.coauthorEnabled = config.coauthorEnabled;
+      if (config.manageScheduleEnabled !== void 0)
+        patch.manageScheduleEnabled = config.manageScheduleEnabled;
+    }
+    if (Object.keys(patch).length === 0) {
+      return;
+    }
+    try {
+      await session.rpc.options.update(patch);
+    } catch (e) {
+      try {
+        await session.disconnect();
+      } catch {
+      }
+      throw e;
+    }
+  }
+  async createSession(config) {
+    if (!this.connection) {
+      await this.start();
+    }
+    config = { ...this.configDefaultsForMode(), ...config };
+    config.systemMessage = this.getSystemMessageConfigForMode(config.systemMessage);
     const sessionId = config.sessionId ?? (0, import_node_crypto.randomUUID)();
     const session = new CopilotSession(
       sessionId,
@@ -4745,6 +6567,7 @@ var CopilotClient = class _CopilotClient {
       this.onGetTraceContext
     );
     session.registerTools(config.tools);
+    session.registerCanvases(config.canvases);
     session.registerCommands(config.commands);
     session.registerPermissionHandler(config.onPermissionRequest);
     if (config.onUserInputRequest) {
@@ -4752,6 +6575,12 @@ var CopilotClient = class _CopilotClient {
     }
     if (config.onElicitationRequest) {
       session.registerElicitationHandler(config.onElicitationRequest);
+    }
+    if (config.onExitPlanModeRequest) {
+      session.registerExitPlanModeHandler(config.onExitPlanModeRequest);
+    }
+    if (config.onAutoModeSwitchRequest) {
+      session.registerAutoModeSwitchHandler(config.onAutoModeSwitchRequest);
     }
     if (config.hooks) {
       session.registerHooks(config.hooks);
@@ -4766,15 +6595,8 @@ var CopilotClient = class _CopilotClient {
       session.on(config.onEvent);
     }
     this.sessions.set(sessionId, session);
-    if (this.sessionFsConfig) {
-      if (config.createSessionFsHandler) {
-        session.clientSessionApis.sessionFs = config.createSessionFsHandler(session);
-      } else {
-        throw new Error(
-          "createSessionFsHandler is required in session config when sessionFs is enabled in client options."
-        );
-      }
-    }
+    this.setupSessionFs(session, config);
+    const toolFilterOptions = this.resolveToolFilterOptions(config);
     try {
       const response = await this.connection.sendRequest("session.create", {
         ...await getTraceContext(this.onGetTraceContext),
@@ -4789,34 +6611,49 @@ var CopilotClient = class _CopilotClient {
           overridesBuiltInTool: tool.overridesBuiltInTool,
           skipPermission: tool.skipPermission
         })),
+        canvases: config.canvases?.map((canvas) => canvas.declaration),
+        requestCanvasRenderer: config.requestCanvasRenderer,
+        requestExtensions: config.requestExtensions,
+        extensionInfo: config.extensionInfo,
         commands: config.commands?.map((cmd) => ({
           name: cmd.name,
           description: cmd.description
         })),
         systemMessage: wireSystemMessage,
-        availableTools: config.availableTools,
-        excludedTools: config.excludedTools,
+        availableTools: toolFilterOptions.availableTools,
+        excludedTools: toolFilterOptions.excludedTools,
+        toolFilterPrecedence: toolFilterOptions.toolFilterPrecedence,
         provider: config.provider,
+        enableSessionTelemetry: config.enableSessionTelemetry,
         modelCapabilities: config.modelCapabilities,
-        requestPermission: true,
+        requestPermission: !!config.onPermissionRequest,
         requestUserInput: !!config.onUserInputRequest,
         requestElicitation: !!config.onElicitationRequest,
+        requestExitPlanMode: !!config.onExitPlanModeRequest,
+        requestAutoModeSwitch: !!config.onAutoModeSwitchRequest,
         hooks: !!(config.hooks && Object.values(config.hooks).some(Boolean)),
         workingDirectory: config.workingDirectory,
         streaming: config.streaming,
-        mcpServers: config.mcpServers,
+        includeSubAgentStreamingEvents: config.includeSubAgentStreamingEvents ?? true,
+        mcpServers: toWireMcpServers(config.mcpServers),
         envValueMode: "direct",
-        customAgents: config.customAgents,
+        customAgents: toWireCustomAgents(config.customAgents),
+        defaultAgent: config.defaultAgent,
         agent: config.agent,
         configDir: config.configDir,
         enableConfigDiscovery: config.enableConfigDiscovery,
         skillDirectories: config.skillDirectories,
+        instructionDirectories: config.instructionDirectories,
         disabledSkills: config.disabledSkills,
-        infiniteSessions: config.infiniteSessions
+        infiniteSessions: config.infiniteSessions,
+        gitHubToken: config.gitHubToken,
+        remoteSession: config.remoteSession,
+        cloud: config.cloud
       });
       const { workspacePath, capabilities } = response;
       session["_workspacePath"] = workspacePath;
       session.setCapabilities(capabilities);
+      await this.updateSessionOptionsForMode(session, config);
     } catch (e) {
       this.sessions.delete(sessionId);
       throw e;
@@ -4848,17 +6685,8 @@ var CopilotClient = class _CopilotClient {
    * ```
    */
   async resumeSession(sessionId, config) {
-    if (!config?.onPermissionRequest) {
-      throw new Error(
-        "An onPermissionRequest handler is required when resuming a session. For example, to allow all permissions, use { onPermissionRequest: approveAll }."
-      );
-    }
     if (!this.connection) {
-      if (this.options.autoStart) {
-        await this.start();
-      } else {
-        throw new Error("Client not connected. Call start() first.");
-      }
+      await this.start();
     }
     const session = new CopilotSession(
       sessionId,
@@ -4867,6 +6695,7 @@ var CopilotClient = class _CopilotClient {
       this.onGetTraceContext
     );
     session.registerTools(config.tools);
+    session.registerCanvases(config.canvases);
     session.registerCommands(config.commands);
     session.registerPermissionHandler(config.onPermissionRequest);
     if (config.onUserInputRequest) {
@@ -4875,9 +6704,17 @@ var CopilotClient = class _CopilotClient {
     if (config.onElicitationRequest) {
       session.registerElicitationHandler(config.onElicitationRequest);
     }
+    if (config.onExitPlanModeRequest) {
+      session.registerExitPlanModeHandler(config.onExitPlanModeRequest);
+    }
+    if (config.onAutoModeSwitchRequest) {
+      session.registerAutoModeSwitchHandler(config.onAutoModeSwitchRequest);
+    }
     if (config.hooks) {
       session.registerHooks(config.hooks);
     }
+    config = { ...this.configDefaultsForMode(), ...config };
+    config.systemMessage = this.getSystemMessageConfigForMode(config.systemMessage);
     const { wirePayload: wireSystemMessage, transformCallbacks } = extractTransformCallbacks(
       config.systemMessage
     );
@@ -4888,15 +6725,8 @@ var CopilotClient = class _CopilotClient {
       session.on(config.onEvent);
     }
     this.sessions.set(sessionId, session);
-    if (this.sessionFsConfig) {
-      if (config.createSessionFsHandler) {
-        session.clientSessionApis.sessionFs = config.createSessionFsHandler(session);
-      } else {
-        throw new Error(
-          "createSessionFsHandler is required in session config when sessionFs is enabled in client options."
-        );
-      }
-    }
+    this.setupSessionFs(session, config);
+    const toolFilterOptions = this.resolveToolFilterOptions(config);
     try {
       const response = await this.connection.sendRequest("session.resume", {
         ...await getTraceContext(this.onGetTraceContext),
@@ -4905,8 +6735,10 @@ var CopilotClient = class _CopilotClient {
         model: config.model,
         reasoningEffort: config.reasoningEffort,
         systemMessage: wireSystemMessage,
-        availableTools: config.availableTools,
-        excludedTools: config.excludedTools,
+        availableTools: toolFilterOptions.availableTools,
+        excludedTools: toolFilterOptions.excludedTools,
+        toolFilterPrecedence: toolFilterOptions.toolFilterPrecedence,
+        enableSessionTelemetry: config.enableSessionTelemetry,
         tools: config.tools?.map((tool) => ({
           name: tool.name,
           description: tool.description,
@@ -4914,52 +6746,52 @@ var CopilotClient = class _CopilotClient {
           overridesBuiltInTool: tool.overridesBuiltInTool,
           skipPermission: tool.skipPermission
         })),
+        canvases: config.canvases?.map((canvas) => canvas.declaration),
+        requestCanvasRenderer: config.requestCanvasRenderer,
+        requestExtensions: config.requestExtensions,
+        extensionInfo: config.extensionInfo,
         commands: config.commands?.map((cmd) => ({
           name: cmd.name,
           description: cmd.description
         })),
         provider: config.provider,
         modelCapabilities: config.modelCapabilities,
-        requestPermission: true,
+        requestPermission: config.onPermissionRequest !== defaultJoinSessionPermissionHandler,
         requestUserInput: !!config.onUserInputRequest,
         requestElicitation: !!config.onElicitationRequest,
+        requestExitPlanMode: !!config.onExitPlanModeRequest,
+        requestAutoModeSwitch: !!config.onAutoModeSwitchRequest,
         hooks: !!(config.hooks && Object.values(config.hooks).some(Boolean)),
         workingDirectory: config.workingDirectory,
         configDir: config.configDir,
         enableConfigDiscovery: config.enableConfigDiscovery,
         streaming: config.streaming,
-        mcpServers: config.mcpServers,
+        includeSubAgentStreamingEvents: config.includeSubAgentStreamingEvents ?? true,
+        mcpServers: toWireMcpServers(config.mcpServers),
         envValueMode: "direct",
-        customAgents: config.customAgents,
+        customAgents: toWireCustomAgents(config.customAgents),
+        defaultAgent: config.defaultAgent,
         agent: config.agent,
         skillDirectories: config.skillDirectories,
+        instructionDirectories: config.instructionDirectories,
         disabledSkills: config.disabledSkills,
         infiniteSessions: config.infiniteSessions,
-        disableResume: config.disableResume
+        suppressResumeEvent: config.suppressResumeEvent,
+        continuePendingWork: config.continuePendingWork,
+        gitHubToken: config.gitHubToken,
+        remoteSession: config.remoteSession,
+        openCanvases: config.openCanvases
       });
-      const { workspacePath, capabilities } = response;
+      const { workspacePath, capabilities, openCanvases } = response;
       session["_workspacePath"] = workspacePath;
       session.setCapabilities(capabilities);
+      session.setOpenCanvases(openCanvases ?? []);
+      await this.updateSessionOptionsForMode(session, config);
     } catch (e) {
       this.sessions.delete(sessionId);
       throw e;
     }
     return session;
-  }
-  /**
-   * Gets the current connection state of the client.
-   *
-   * @returns The current connection state: "disconnected", "connecting", "connected", or "error"
-   *
-   * @example
-   * ```typescript
-   * if (client.getState() === "connected") {
-   *   const session = await client.createSession({ onPermissionRequest: approveAll });
-   * }
-   * ```
-   */
-  getState() {
-    return this.state;
   }
   /**
    * Sends a ping request to the server to verify connectivity.
@@ -5032,6 +6864,22 @@ var CopilotClient = class _CopilotClient {
         const result = await this.connection.sendRequest("models.list", {});
         const response = result;
         models = response.models;
+        for (const model of models) {
+          const m = model;
+          if (!m.capabilities) {
+            m.capabilities = {
+              supports: {},
+              limits: { max_context_window_tokens: 0 }
+            };
+          } else {
+            if (!m.capabilities.supports) m.capabilities.supports = {};
+            if (!m.capabilities.limits) {
+              m.capabilities.limits = { max_context_window_tokens: 0 };
+            } else if (m.capabilities.limits.max_context_window_tokens === void 0) {
+              m.capabilities.limits.max_context_window_tokens = 0;
+            }
+          }
+        }
       }
       this.modelsCache = [...models];
       return [...models];
@@ -5040,18 +6888,29 @@ var CopilotClient = class _CopilotClient {
     }
   }
   /**
-   * Verify that the server's protocol version is within the supported range
-   * and store the negotiated version.
+   * Send the `connect` handshake (carrying the optional token) and verify the
+   * server's protocol version. Falls back to `ping` against legacy servers
+   * that don't implement `connect`.
    */
   async verifyProtocolVersion() {
-    const maxVersion = getSdkProtocolVersion();
-    let pingResult;
-    if (this.processExitPromise) {
-      pingResult = await Promise.race([this.ping(), this.processExitPromise]);
-    } else {
-      pingResult = await this.ping();
+    if (!this.connection) {
+      throw new Error("Client not connected");
     }
-    const serverVersion = pingResult.protocolVersion;
+    const maxVersion = getSdkProtocolVersion();
+    const raceAgainstExit = (p) => this.processExitPromise ? Promise.race([p, this.processExitPromise]) : p;
+    let serverVersion;
+    try {
+      const result = await raceAgainstExit(
+        this.internalRpc.connect({ token: this.effectiveConnectionToken })
+      );
+      serverVersion = result.protocolVersion;
+    } catch (err) {
+      if (err instanceof import_node2.ResponseError && (err.code === import_node2.ErrorCodes.MethodNotFound || err.message === "Unhandled method connect")) {
+        serverVersion = (await raceAgainstExit(this.ping())).protocolVersion;
+      } else {
+        throw err;
+      }
+    }
     if (serverVersion === void 0) {
       throw new Error(
         `SDK protocol version mismatch: SDK supports versions ${MIN_PROTOCOL_VERSION}-${maxVersion}, but server does not report a protocol version. Please update your server to ensure compatibility.`
@@ -5135,8 +6994,13 @@ var CopilotClient = class _CopilotClient {
     if (!this.connection) {
       throw new Error("Client not connected");
     }
+    let wireFilter;
+    if (filter) {
+      const { workingDirectory, ...rest } = filter;
+      wireFilter = { ...rest, cwd: workingDirectory };
+    }
     const response = await this.connection.sendRequest("session.list", {
-      filter
+      filter: wireFilter
     });
     const { sessions } = response;
     return sessions.map(_CopilotClient.toSessionMetadata);
@@ -5171,13 +7035,19 @@ var CopilotClient = class _CopilotClient {
     return _CopilotClient.toSessionMetadata(session);
   }
   static toSessionMetadata(raw) {
+    const { context } = raw;
     return {
       sessionId: raw.sessionId,
       startTime: new Date(raw.startTime),
       modifiedTime: new Date(raw.modifiedTime),
       summary: raw.summary,
       isRemote: raw.isRemote,
-      context: raw.context
+      context: context ? {
+        workingDirectory: context.cwd,
+        gitRoot: context.gitRoot,
+        repository: context.repository,
+        branch: context.branch
+      } : void 0
     };
   }
   /**
@@ -5230,7 +7100,7 @@ var CopilotClient = class _CopilotClient {
       throw new Error(result.error || "Failed to set foreground session");
     }
   }
-  on(eventTypeOrHandler, handler) {
+  onLifecycle(eventTypeOrHandler, handler) {
     if (typeof eventTypeOrHandler === "string" && handler) {
       const eventType = eventTypeOrHandler;
       if (!this.typedLifecycleHandlers.has(eventType)) {
@@ -5257,32 +7127,50 @@ var CopilotClient = class _CopilotClient {
   async startCLIServer() {
     return new Promise((resolve4, reject) => {
       this.stderrBuffer = "";
-      const args = [
-        ...this.options.cliArgs,
-        "--headless",
-        "--no-auto-update",
-        "--log-level",
-        this.options.logLevel
-      ];
-      if (this.options.useStdio) {
-        args.push("--stdio");
-      } else if (this.options.port > 0) {
-        args.push("--port", this.options.port.toString());
+      const args = [...this.connectionExtraArgs, "--headless", "--no-auto-update"];
+      if (this.options.logLevel) {
+        args.push("--log-level", this.options.logLevel);
       }
-      if (this.options.githubToken) {
+      if (this.connectionConfig.kind === "stdio") {
+        args.push("--stdio");
+      } else if (this.connectionConfig.kind === "tcp") {
+        const requestedPort = this.connectionConfig.port ?? 0;
+        if (requestedPort > 0) {
+          args.push("--port", requestedPort.toString());
+        }
+      }
+      if (this.options.gitHubToken) {
         args.push("--auth-token-env", "COPILOT_SDK_AUTH_TOKEN");
       }
       if (!this.options.useLoggedInUser) {
         args.push("--no-auto-login");
       }
-      const envWithoutNodeDebug = { ...this.options.env };
-      delete envWithoutNodeDebug.NODE_DEBUG;
-      if (this.options.githubToken) {
-        envWithoutNodeDebug.COPILOT_SDK_AUTH_TOKEN = this.options.githubToken;
+      if (this.options.sessionIdleTimeoutSeconds !== void 0 && this.options.sessionIdleTimeoutSeconds > 0) {
+        args.push(
+          "--session-idle-timeout",
+          this.options.sessionIdleTimeoutSeconds.toString()
+        );
       }
-      if (!this.options.cliPath) {
+      if (this.options.enableRemoteSessions) {
+        args.push("--remote");
+      }
+      const envWithoutNodeDebug = { ...this.resolvedEnv };
+      delete envWithoutNodeDebug.NODE_DEBUG;
+      if (this.options.gitHubToken) {
+        envWithoutNodeDebug.COPILOT_SDK_AUTH_TOKEN = this.options.gitHubToken;
+      }
+      if (this.effectiveConnectionToken) {
+        envWithoutNodeDebug.COPILOT_CONNECTION_TOKEN = this.effectiveConnectionToken;
+      }
+      if (this.options.baseDirectory) {
+        envWithoutNodeDebug.COPILOT_HOME = this.options.baseDirectory;
+      }
+      if (this.options.mode === "empty") {
+        envWithoutNodeDebug.COPILOT_DISABLE_KEYTAR = "1";
+      }
+      if (!this.resolvedCliPath) {
         throw new Error(
-          "Path to Copilot CLI is required. Please provide it via the cliPath option, or use cliUrl to rely on a remote CLI."
+          "Path to Copilot CLI is required. Please supply it via `RuntimeConnection.forStdio({ path })` or `RuntimeConnection.forTcp({ path })`, set the COPILOT_CLI_PATH environment variable, or use `RuntimeConnection.forUri(...)` to connect to an already-running runtime."
         );
       }
       if (this.options.telemetry) {
@@ -5301,31 +7189,31 @@ var CopilotClient = class _CopilotClient {
             t.captureContent
           );
       }
-      if (!(0, import_node_fs.existsSync)(this.options.cliPath)) {
+      if (!(0, import_node_fs.existsSync)(this.resolvedCliPath)) {
         throw new Error(
-          `Copilot CLI not found at ${this.options.cliPath}. Ensure @github/copilot is installed.`
+          `Copilot CLI not found at ${this.resolvedCliPath}. Ensure @github/copilot is installed.`
         );
       }
-      const stdioConfig = this.options.useStdio ? ["pipe", "pipe", "pipe"] : ["ignore", "pipe", "pipe"];
-      const isJsFile = this.options.cliPath.endsWith(".js");
+      const stdioConfig = this.connectionConfig.kind === "stdio" ? ["pipe", "pipe", "pipe"] : ["ignore", "pipe", "pipe"];
+      const isJsFile = this.resolvedCliPath.endsWith(".js");
       if (isJsFile) {
-        this.cliProcess = (0, import_node_child_process.spawn)(getNodeExecPath(), [this.options.cliPath, ...args], {
+        this.cliProcess = (0, import_node_child_process.spawn)(getNodeExecPath(), [this.resolvedCliPath, ...args], {
           stdio: stdioConfig,
-          cwd: this.options.cwd,
+          cwd: this.options.workingDirectory,
           env: envWithoutNodeDebug,
           windowsHide: true
         });
       } else {
-        this.cliProcess = (0, import_node_child_process.spawn)(this.options.cliPath, args, {
+        this.cliProcess = (0, import_node_child_process.spawn)(this.resolvedCliPath, args, {
           stdio: stdioConfig,
-          cwd: this.options.cwd,
+          cwd: this.options.workingDirectory,
           env: envWithoutNodeDebug,
           windowsHide: true
         });
       }
       let stdout = "";
       let resolved = false;
-      if (this.options.useStdio) {
+      if (this.connectionConfig.kind === "stdio") {
         resolved = true;
         resolve4();
       } else {
@@ -5333,7 +7221,7 @@ var CopilotClient = class _CopilotClient {
           stdout += data.toString();
           const match = stdout.match(/listening on port (\d+)/i);
           if (match && !resolved) {
-            this.actualPort = parseInt(match[1], 10);
+            this.runtimePort = parseInt(match[1], 10);
             resolved = true;
             resolve4();
           }
@@ -5402,24 +7290,26 @@ stderr: ${stderrOutput}`
           }
         }
       });
-      setTimeout(() => {
+      this.cliStartTimeout = setTimeout(() => {
         if (!resolved) {
           resolved = true;
           reject(new Error("Timeout waiting for CLI server to start"));
         }
-      }, 1e4);
+      }, 3e4);
     });
   }
   /**
    * Connect to the CLI server (via socket or stdio)
    */
   async connectToServer() {
-    if (this.options.isChildProcess) {
-      return this.connectToParentProcessViaStdio();
-    } else if (this.options.useStdio) {
-      return this.connectToChildProcessViaStdio();
-    } else {
-      return this.connectViaTcp();
+    switch (this.connectionConfig.kind) {
+      case "parent-process":
+        return this.connectToParentProcessViaStdio();
+      case "stdio":
+        return this.connectToChildProcessViaStdio();
+      case "tcp":
+      case "uri":
+        return this.connectViaTcp();
     }
   }
   /**
@@ -5459,12 +7349,17 @@ stderr: ${stderrOutput}`
    * Connect to the CLI server via TCP socket
    */
   async connectViaTcp() {
-    if (!this.actualPort) {
+    if (!this.runtimePort) {
       throw new Error("Server port not available");
     }
     return new Promise((resolve4, reject) => {
       this.socket = new import_node_net.Socket();
-      this.socket.connect(this.actualPort, this.actualHost, () => {
+      const connectionTimeout = setTimeout(() => {
+        this.socket?.destroy();
+        reject(new Error("Timeout connecting to CLI server"));
+      }, 1e4);
+      this.socket.connect(this.runtimePort, this.actualHost, () => {
+        clearTimeout(connectionTimeout);
         this.connection = (0, import_node2.createMessageConnection)(
           new import_node2.StreamMessageReader(this.socket),
           new import_node2.StreamMessageWriter(this.socket)
@@ -5474,6 +7369,7 @@ stderr: ${stderrOutput}`
         resolve4();
       });
       this.socket.on("error", (error) => {
+        clearTimeout(connectionTimeout);
         reject(new Error(`Failed to connect to CLI server: ${error.message}`));
       });
     });
@@ -5489,16 +7385,16 @@ stderr: ${stderrOutput}`
       this.handleSessionLifecycleNotification(notification);
     });
     this.connection.onRequest(
-      "tool.call",
-      async (params) => await this.handleToolCallRequestV2(params)
-    );
-    this.connection.onRequest(
-      "permission.request",
-      async (params) => await this.handlePermissionRequestV2(params)
-    );
-    this.connection.onRequest(
       "userInput.request",
       async (params) => await this.handleUserInputRequest(params)
+    );
+    this.connection.onRequest(
+      "exitPlanMode.request",
+      async (params) => await this.handleExitPlanModeRequest(params)
+    );
+    this.connection.onRequest(
+      "autoModeSwitch.request",
+      async (params) => await this.handleAutoModeSwitchRequest(params)
     );
     this.connection.onRequest(
       "hooks.invoke",
@@ -5534,7 +7430,20 @@ stderr: ${stderrOutput}`
     if (typeof notification !== "object" || !notification || !("type" in notification) || typeof notification.type !== "string" || !("sessionId" in notification) || typeof notification.sessionId !== "string") {
       return;
     }
-    const event = notification;
+    const raw = notification;
+    let metadata;
+    if (raw.metadata && raw.metadata.startTime && raw.metadata.modifiedTime) {
+      metadata = {
+        startTime: new Date(raw.metadata.startTime),
+        modifiedTime: new Date(raw.metadata.modifiedTime),
+        summary: raw.metadata.summary
+      };
+    }
+    const event = {
+      type: raw.type,
+      sessionId: raw.sessionId,
+      metadata
+    };
     const typedHandlers = this.typedLifecycleHandlers.get(event.type);
     if (typedHandlers) {
       for (const handler of typedHandlers) {
@@ -5566,6 +7475,35 @@ stderr: ${stderrOutput}`
     });
     return result;
   }
+  async handleExitPlanModeRequest(params) {
+    if (!params || typeof params.sessionId !== "string" || typeof params.summary !== "string" || !Array.isArray(params.actions) || typeof params.recommendedAction !== "string") {
+      throw new Error("Invalid exit plan mode request payload");
+    }
+    const session = this.sessions.get(params.sessionId);
+    if (!session) {
+      throw new Error(`Session not found: ${params.sessionId}`);
+    }
+    return await session._handleExitPlanModeRequest({
+      summary: params.summary,
+      planContent: params.planContent,
+      actions: params.actions,
+      recommendedAction: params.recommendedAction
+    });
+  }
+  async handleAutoModeSwitchRequest(params) {
+    if (!params || typeof params.sessionId !== "string") {
+      throw new Error("Invalid auto mode switch request payload");
+    }
+    const session = this.sessions.get(params.sessionId);
+    if (!session) {
+      throw new Error(`Session not found: ${params.sessionId}`);
+    }
+    const response = await session._handleAutoModeSwitchRequest({
+      errorCode: params.errorCode,
+      retryAfterSeconds: params.retryAfterSeconds
+    });
+    return { response };
+  }
   async handleHooksInvoke(params) {
     if (!params || typeof params.sessionId !== "string" || typeof params.hookType !== "string") {
       throw new Error("Invalid hooks invoke payload");
@@ -5586,105 +7524,6 @@ stderr: ${stderrOutput}`
       throw new Error(`Session not found: ${params.sessionId}`);
     }
     return await session._handleSystemMessageTransform(params.sections);
-  }
-  // ========================================================================
-  // Protocol v2 backward-compatibility adapters
-  // ========================================================================
-  /**
-   * Handles a v2-style tool.call RPC request from the server.
-   * Looks up the session and tool handler, executes it, and returns the result
-   * in the v2 response format.
-   */
-  async handleToolCallRequestV2(params) {
-    if (!params || typeof params.sessionId !== "string" || typeof params.toolCallId !== "string" || typeof params.toolName !== "string") {
-      throw new Error("Invalid tool call payload");
-    }
-    const session = this.sessions.get(params.sessionId);
-    if (!session) {
-      throw new Error(`Unknown session ${params.sessionId}`);
-    }
-    const handler = session.getToolHandler(params.toolName);
-    if (!handler) {
-      return {
-        result: {
-          textResultForLlm: `Tool '${params.toolName}' is not supported by this client instance.`,
-          resultType: "failure",
-          error: `tool '${params.toolName}' not supported`,
-          toolTelemetry: {}
-        }
-      };
-    }
-    try {
-      const traceparent = params.traceparent;
-      const tracestate = params.tracestate;
-      const invocation = {
-        sessionId: params.sessionId,
-        toolCallId: params.toolCallId,
-        toolName: params.toolName,
-        arguments: params.arguments,
-        traceparent,
-        tracestate
-      };
-      const result = await handler(params.arguments, invocation);
-      return { result: this.normalizeToolResultV2(result) };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return {
-        result: {
-          textResultForLlm: "Invoking this tool produced an error. Detailed information is not available.",
-          resultType: "failure",
-          error: message,
-          toolTelemetry: {}
-        }
-      };
-    }
-  }
-  /**
-   * Handles a v2-style permission.request RPC request from the server.
-   */
-  async handlePermissionRequestV2(params) {
-    if (!params || typeof params.sessionId !== "string" || !params.permissionRequest) {
-      throw new Error("Invalid permission request payload");
-    }
-    const session = this.sessions.get(params.sessionId);
-    if (!session) {
-      throw new Error(`Session not found: ${params.sessionId}`);
-    }
-    try {
-      const result = await session._handlePermissionRequestV2(params.permissionRequest);
-      return { result };
-    } catch (error) {
-      if (error instanceof Error && error.message === NO_RESULT_PERMISSION_V2_ERROR) {
-        throw error;
-      }
-      return {
-        result: {
-          kind: "denied-no-approval-rule-and-could-not-request-from-user"
-        }
-      };
-    }
-  }
-  normalizeToolResultV2(result) {
-    if (result === void 0 || result === null) {
-      return {
-        textResultForLlm: "Tool returned no result",
-        resultType: "failure",
-        error: "tool returned no result",
-        toolTelemetry: {}
-      };
-    }
-    if (this.isToolResultObject(result)) {
-      return result;
-    }
-    const textResult = typeof result === "string" ? result : JSON.stringify(result);
-    return {
-      textResultForLlm: textResult,
-      resultType: "success",
-      toolTelemetry: {}
-    };
-  }
-  isToolResultObject(value) {
-    return typeof value === "object" && value !== null && "textResultForLlm" in value && typeof value.textResultForLlm === "string" && "resultType" in value;
   }
 };
 
@@ -5745,12 +7584,22 @@ function recordSnapshot(stateDir, quotas) {
       remainingPercentage: entry.remainingPercentage ?? 100,
       resetDate: entry.resetDate ?? "",
       isUnlimitedEntitlement: entry.isUnlimitedEntitlement ?? false,
-      usageAllowedWithExhaustedQuota: entry.usageAllowedWithExhaustedQuota ?? false
+      usageAllowedWithExhaustedQuota: entry.usageAllowedWithExhaustedQuota ?? false,
+      overage: entry.overage ?? 0,
+      overageAllowedWithExhaustedQuota: entry.overageAllowedWithExhaustedQuota ?? false
     };
   }
   (0, import_node_fs2.mkdirSync)((0, import_node_path2.dirname)(snapshotPath(stateDir)), { recursive: true });
   (0, import_node_fs2.writeFileSync)(snapshotPath(stateDir), JSON.stringify(merged, null, 2), "utf-8");
   return merged;
+}
+async function fetchQuota(client, stateDir) {
+  try {
+    const result = await client.rpc.account.getQuota({});
+    return recordSnapshot(stateDir, result.quotaSnapshots ?? {});
+  } catch {
+    return null;
+  }
 }
 function isPremiumModel(modelId) {
   if (!modelId) return true;
@@ -5824,6 +7673,7 @@ function summarize(snapshot) {
       total: q.entitlementRequests,
       remaining,
       remainingPercentage: q.remainingPercentage,
+      overage: q.overage || void 0,
       resetAt: q.resetDate || void 0
     };
   });
@@ -5854,6 +7704,9 @@ function summarize(snapshot) {
     resetAt: tightestReset || void 0
   };
 }
+function fmtNum(n) {
+  return Number.isInteger(n) ? String(n) : parseFloat(n.toFixed(2)).toString();
+}
 var BAR_WIDTH = 30;
 function renderBar(usedPct) {
   const clamped = Math.max(0, Math.min(100, usedPct));
@@ -5883,11 +7736,14 @@ function renderQuotaBar(q, haveSnapshot) {
   for (const p of metered) {
     const remainingPct = p.remainingPercentage ?? 0;
     const usedPct = 100 - remainingPct;
-    const total = p.total ?? "?";
-    const remaining = p.remaining ?? 0;
+    const total = p.total === void 0 ? "?" : fmtNum(p.total);
+    const remaining = fmtNum(p.remaining ?? 0);
     lines.push(`${p.label}`);
     lines.push(`  Usage      ${renderBar(usedPct)}  ${usedPct.toFixed(1)}%`);
     lines.push(`  Remaining  ${remaining} / ${total}`);
+    if (p.overage && p.overage > 0) {
+      lines.push(`  Overage    ${fmtNum(p.overage)} (billed beyond entitlement)`);
+    }
     if (p.resetAt) {
       const days = daysUntil(p.resetAt);
       const suffix = days === null ? "" : days === 0 ? "  (resets today)" : `  (in ~${days} days)`;
@@ -6178,12 +8034,12 @@ var PLUGIN_VERSION = "0.1.0";
 var CLIENT_NAME = "copilot-plugin-cc";
 
 // src/commands/setup.ts
-var DEFAULT_MODEL = "claude-opus-4.6";
+var DEFAULT_MODEL = "claude-opus-4.8";
 async function runSetup(options = {}) {
   const cwd = options.cwd ?? process.cwd();
   const stateDir = resolveStateDir(cwd);
   const isCheck = options.check === true;
-  const client = new CopilotClient({ cwd });
+  const client = new CopilotClient({ workingDirectory: cwd });
   try {
     await client.start();
   } catch (err) {
@@ -6231,6 +8087,7 @@ async function runSetup(options = {}) {
   const claudeModels = modelIds.filter((id) => id.toLowerCase().includes("claude"));
   const defaultAvailable = modelIds.includes(DEFAULT_MODEL);
   const pruneReport = pruneOrphans(cwd);
+  await fetchQuota(client, stateDir).catch(() => null);
   await client.stop().catch(() => {
   });
   if (isCheck) {
@@ -6436,18 +8293,14 @@ function attachStream(opts) {
         break;
       }
       case "assistant.usage": {
-        const snapshots = event.data.quotaSnapshots;
-        if (snapshots) {
-          recordSnapshot(stateDir, snapshots);
-          const keys = Object.keys(snapshots);
-          for (const k of keys) {
-            const q = snapshots[k];
-            const remaining = Math.max(0, q.entitlementRequests - q.usedRequests);
-            progress(`[quota:${k}] ${remaining}/${q.entitlementRequests} remaining (${q.remainingPercentage.toFixed(1)}%)`);
-          }
-        }
         const reqId = event.data.providerCallId ?? event.data.apiCallId;
-        appendLog2(`assistant.usage model=${event.data.model}${reqId ? ` request=${reqId}` : ""}`);
+        const cost = event.data.cost;
+        appendLog2(
+          `assistant.usage model=${event.data.model}${cost !== void 0 ? ` cost=${cost}` : ""}${reqId ? ` request=${reqId}` : ""}`
+        );
+        if (cost !== void 0 && cost > 0) {
+          progress(`[usage] ${event.data.model} +${cost} premium cost`);
+        }
         break;
       }
       case "session.task_complete": {
@@ -6471,13 +8324,17 @@ function attachStream(opts) {
       }
       case "session.shutdown": {
         const d = event.data;
+        let premiumRequestCost = 0;
+        for (const m of Object.values(d.modelMetrics ?? {})) {
+          premiumRequestCost += m?.requests?.cost ?? 0;
+        }
         appendLog2(
-          `session.shutdown type=${d.shutdownType} premium=${d.totalPremiumRequests} files=${d.codeChanges.filesModified.length} +${d.codeChanges.linesAdded}/-${d.codeChanges.linesRemoved}`
+          `session.shutdown type=${d.shutdownType} premiumCost=${premiumRequestCost} files=${d.codeChanges.filesModified.length} +${d.codeChanges.linesAdded}/-${d.codeChanges.linesRemoved}`
         );
         resolveShutdown({
           shutdownType: d.shutdownType,
           errorReason: d.errorReason,
-          totalPremiumRequests: d.totalPremiumRequests,
+          premiumRequestCost,
           codeChanges: {
             linesAdded: d.codeChanges.linesAdded,
             linesRemoved: d.codeChanges.linesRemoved,
@@ -6583,7 +8440,7 @@ function attachStream(opts) {
 }
 
 // src/commands/implement.ts
-var DEFAULT_MODEL2 = "claude-opus-4.6";
+var DEFAULT_MODEL2 = "claude-opus-4.8";
 var DEFAULT_EFFORT = "medium";
 var DEFAULT_TIMEOUT_MS = 30 * 60 * 1e3;
 function progressFactory() {
@@ -6667,7 +8524,7 @@ async function runImplement(task, cwd, options = {}) {
     }
   }
   const client = new CopilotClient({
-    cwd: sessionCwd,
+    workingDirectory: sessionCwd,
     env: process.env
   });
   let sessionAborted = false;
@@ -6758,13 +8615,21 @@ async function runImplement(task, cwd, options = {}) {
     process.exit(1);
   }
   clearTimeout(timeoutHandle);
-  progress("Task complete; disconnecting session and collecting shutdown metrics.");
+  progress("Task complete; collecting usage metrics, disconnecting session.");
+  let premiumRequestCost;
+  try {
+    const metrics = await session.rpc.usage.getMetrics();
+    premiumRequestCost = metrics.totalPremiumRequestCost;
+  } catch (e) {
+    log(`usage.getMetrics failed: ${e.message}`);
+  }
   await session.disconnect().catch((e) => log(`disconnect warn: ${e.message}`));
   const shutdownResult = await Promise.race([
     stream.shutdown,
     new Promise((res) => setTimeout(() => res(null), 5e3))
   ]);
   stream.dispose();
+  await fetchQuota(client, stateDir).catch(() => null);
   await client.stop().catch(() => {
   });
   if (handle) {
@@ -6816,7 +8681,7 @@ async function runImplement(task, cwd, options = {}) {
     filesModified,
     linesAdded,
     linesRemoved,
-    premiumRequests: shutdownResult?.totalPremiumRequests ?? 0,
+    premiumRequestCost: premiumRequestCost ?? shutdownResult?.premiumRequestCost ?? 0,
     model: shutdownResult?.currentModel ?? model,
     quotaRemaining
   };
@@ -6827,7 +8692,7 @@ async function runImplement(task, cwd, options = {}) {
     (0, import_node_fs6.writeFileSync)(outPath, envelopeJson + "\n", "utf-8");
     progress(`Report saved to ${outPath}`);
   }
-  log(`implement done: branch=${envelope.branch ?? "none"} files=${envelope.filesModified.length} premium=${envelope.premiumRequests}`);
+  log(`implement done: branch=${envelope.branch ?? "none"} files=${envelope.filesModified.length} premiumCost=${envelope.premiumRequestCost}`);
   progress(`Job log: ${jobLogPath(stateDir, jobId)}`);
 }
 
@@ -7292,7 +9157,7 @@ function buildReviewPrompt(kind, vars) {
 // src/commands/review.ts
 var DEFAULT_TIMEOUT_MS2 = 30 * 60 * 1e3;
 var DEFAULT_MODEL_STANDARD = "gpt-5.3-codex";
-var DEFAULT_MODEL_ADVERSARIAL = "gpt-5.4";
+var DEFAULT_MODEL_ADVERSARIAL = "gpt-5.5";
 var DEFAULT_EFFORT_STANDARD = "xhigh";
 var DEFAULT_EFFORT_ADVERSARIAL = "xhigh";
 function progressFactory2() {
@@ -7337,7 +9202,7 @@ No changes to review under ${context.target.label}.
   }
   const prompt = buildReviewPrompt(kind, { context, focusText: options.focusText ?? "" });
   log(`prompt built: ${prompt.length} chars`);
-  const client = new CopilotClient({ cwd: context.repoRoot, env: process.env });
+  const client = new CopilotClient({ workingDirectory: context.repoRoot, env: process.env });
   let cleanupDone = false;
   let aborted = false;
   const finalize = async (errorMessage) => {
@@ -7406,6 +9271,7 @@ No changes to review under ${context.target.label}.
   const stream = attachStream({ session, stateDir, appendLog: log, progress });
   let completionResult = null;
   let shutdownResult = null;
+  let premiumRequestCost;
   let timedOut = false;
   let sessionTorn = false;
   const timeoutHandle = setTimeout(() => {
@@ -7420,13 +9286,20 @@ No changes to review under ${context.target.label}.
     clearTimeout(timeoutHandle);
     await session.disconnect().catch((e) => log(`disconnect warn: ${e.message}`));
     stream.dispose();
+    await fetchQuota(client, stateDir).catch(() => null);
     await client.stop().catch((e) => log(`client.stop warn: ${e.message}`));
   };
   try {
     progress(`Sending ${kind} review prompt to Copilot (model=${model}, effort=${reasoning})\u2026`);
     await session.send({ prompt });
     completionResult = await stream.completion;
-    progress("Review complete; collecting shutdown metrics.");
+    progress("Review complete; collecting usage metrics.");
+    try {
+      const metrics = await session.rpc.usage.getMetrics();
+      premiumRequestCost = metrics.totalPremiumRequestCost;
+    } catch (e) {
+      log(`usage.getMetrics failed: ${e.message}`);
+    }
     await session.disconnect().catch((e) => log(`disconnect warn: ${e.message}`));
     shutdownResult = await Promise.race([
       stream.shutdown,
@@ -7457,15 +9330,15 @@ ${reviewBody}
     throw new Error(reason);
   }
   const quotaRemaining = summarize(readSnapshot(stateDir));
-  const premium = shutdownResult?.totalPremiumRequests ?? 0;
+  const premium = premiumRequestCost ?? shutdownResult?.premiumRequestCost ?? 0;
   const usedModel = shutdownResult?.currentModel ?? model;
   process.stdout.write(`${reviewBody.trim()}
 `);
   const poolNote = quotaRemaining.pools.length > 0 ? quotaRemaining.pools.map(
-    (p) => p.unlimited ? `${p.label}=unlimited` : `${p.label}=${p.remaining}/${p.total}`
+    (p) => p.unlimited ? `${p.label}=unlimited` : `${p.label}=${fmtNum(p.remaining ?? 0)}/${fmtNum(p.total ?? 0)}`
   ).join(", ") : "no quota snapshot yet";
   progress(
-    `Review done \u2014 kind=${kind} model=${usedModel} effort=${reasoning} files=${context.fileCount} premium-used=${premium} | ${poolNote}`
+    `Review done \u2014 kind=${kind} model=${usedModel} effort=${reasoning} files=${context.fileCount} premium-cost=${fmtNum(premium)} | ${poolNote}`
   );
   log(`review done: kind=${kind} files=${context.fileCount} premium=${premium} pools=${poolNote}`);
   progress(`Job log: ${jobLogPath(stateDir, jobId)}`);

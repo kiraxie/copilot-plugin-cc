@@ -10,7 +10,6 @@
  */
 
 import type { CopilotSession, SessionEvent } from '@github/copilot-sdk';
-import { recordSnapshot } from './quota.js';
 
 export interface AttachOptions {
   session: CopilotSession;
@@ -53,7 +52,12 @@ export interface TaskCompletion {
 export interface SessionShutdown {
   shutdownType: 'routine' | 'error';
   errorReason?: string;
-  totalPremiumRequests: number;
+  /**
+   * Total premium-request cost for the session, summed from the shutdown
+   * event's per-model metrics. May be fractional (per-model multipliers).
+   * A fallback for `usage.getMetrics().totalPremiumRequestCost`.
+   */
+  premiumRequestCost: number;
   codeChanges: {
     linesAdded: number;
     linesRemoved: number;
@@ -102,18 +106,18 @@ export function attachStream(opts: AttachOptions): AttachedStream {
       }
 
       case 'assistant.usage': {
-        const snapshots = event.data.quotaSnapshots;
-        if (snapshots) {
-          recordSnapshot(stateDir, snapshots);
-          const keys = Object.keys(snapshots);
-          for (const k of keys) {
-            const q = snapshots[k]!;
-            const remaining = Math.max(0, q.entitlementRequests - q.usedRequests);
-            progress(`[quota:${k}] ${remaining}/${q.entitlementRequests} remaining (${q.remainingPercentage.toFixed(1)}%)`);
-          }
-        }
+        // As of SDK 1.0 this event no longer carries quota snapshots — quota is
+        // fetched actively via `account.getQuota`. It now reports a per-call
+        // `cost` (the model's premium-request multiplier) which we surface for
+        // visibility into the new billing model.
         const reqId = event.data.providerCallId ?? event.data.apiCallId;
-        appendLog(`assistant.usage model=${event.data.model}${reqId ? ` request=${reqId}` : ''}`);
+        const cost = event.data.cost;
+        appendLog(
+          `assistant.usage model=${event.data.model}${cost !== undefined ? ` cost=${cost}` : ''}${reqId ? ` request=${reqId}` : ''}`,
+        );
+        if (cost !== undefined && cost > 0) {
+          progress(`[usage] ${event.data.model} +${cost} premium cost`);
+        }
         break;
       }
 
@@ -146,13 +150,19 @@ export function attachStream(opts: AttachOptions): AttachedStream {
 
       case 'session.shutdown': {
         const d = event.data;
+        // Sum per-model request cost (SDK 1.0 dropped the flat
+        // `totalPremiumRequests` integer in favour of multiplier-based cost).
+        let premiumRequestCost = 0;
+        for (const m of Object.values(d.modelMetrics ?? {})) {
+          premiumRequestCost += m?.requests?.cost ?? 0;
+        }
         appendLog(
-          `session.shutdown type=${d.shutdownType} premium=${d.totalPremiumRequests} files=${d.codeChanges.filesModified.length} +${d.codeChanges.linesAdded}/-${d.codeChanges.linesRemoved}`,
+          `session.shutdown type=${d.shutdownType} premiumCost=${premiumRequestCost} files=${d.codeChanges.filesModified.length} +${d.codeChanges.linesAdded}/-${d.codeChanges.linesRemoved}`,
         );
         resolveShutdown({
           shutdownType: d.shutdownType,
           errorReason: d.errorReason,
-          totalPremiumRequests: d.totalPremiumRequests,
+          premiumRequestCost,
           codeChanges: {
             linesAdded: d.codeChanges.linesAdded,
             linesRemoved: d.codeChanges.linesRemoved,

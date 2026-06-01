@@ -16,7 +16,7 @@ import { CopilotClient } from '@github/copilot-sdk';
 export type ReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh';
 
 import { resolveStateDir, generateJobId, appendLog, jobLogPath } from '../lib/state.js';
-import { readSnapshot, evaluateGate, summarize } from '../lib/quota.js';
+import { readSnapshot, evaluateGate, summarize, fetchQuota } from '../lib/quota.js';
 import { checkAuth } from '../lib/copilot-auth.js';
 import { makePermissionHandler } from '../lib/permission.js';
 import { attachStream } from '../lib/event-stream.js';
@@ -39,7 +39,7 @@ export interface ImplementOptions {
   jobId?: string;
 }
 
-const DEFAULT_MODEL = 'claude-opus-4.6';
+const DEFAULT_MODEL = 'claude-opus-4.8';
 const DEFAULT_EFFORT: ReasoningEffort = 'medium';
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000;
 
@@ -71,7 +71,11 @@ interface CompletedEnvelope {
   filesModified: string[];
   linesAdded: number;
   linesRemoved: number;
-  premiumRequests: number;
+  /**
+   * Premium-request cost for the session. As of Copilot's multiplier-based
+   * billing this may be fractional (e.g. an Opus call can cost more than 1).
+   */
+  premiumRequestCost: number;
   model: string;
   quotaRemaining?: ReturnType<typeof summarize>;
 }
@@ -165,7 +169,7 @@ export async function runImplement(task: string, cwd: string, options: Implement
 
   // 3. Copilot client --------------------------------------------------------
   const client = new CopilotClient({
-    cwd: sessionCwd,
+    workingDirectory: sessionCwd,
     env: process.env,
   });
 
@@ -271,7 +275,19 @@ export async function runImplement(task: string, cwd: string, options: Implement
   clearTimeout(timeoutHandle);
 
   // 7. Disconnect, wait for shutdown -----------------------------------------
-  progress('Task complete; disconnecting session and collecting shutdown metrics.');
+  progress('Task complete; collecting usage metrics, disconnecting session.');
+
+  // Premium cost: query session usage metrics while the session is still alive
+  // (the shutdown event's summed model cost is a fallback). Fractional under
+  // Copilot's multiplier-based billing.
+  let premiumRequestCost: number | undefined;
+  try {
+    const metrics = await session.rpc.usage.getMetrics();
+    premiumRequestCost = metrics.totalPremiumRequestCost;
+  } catch (e) {
+    log(`usage.getMetrics failed: ${(e as Error).message}`);
+  }
+
   await session.disconnect().catch((e) => log(`disconnect warn: ${(e as Error).message}`));
 
   const shutdownResult = await Promise.race([
@@ -280,6 +296,11 @@ export async function runImplement(task: string, cwd: string, options: Implement
   ]);
 
   stream.dispose();
+
+  // Refresh the cached quota snapshot post-run so the envelope reflects the
+  // usage we just consumed (the SDK no longer pushes quota via events).
+  await fetchQuota(client, stateDir).catch(() => null);
+
   await client.stop().catch(() => { /* ignore */ });
 
   // 8. Commit worktree changes (Copilot edits files but does not commit). -----
@@ -346,7 +367,7 @@ export async function runImplement(task: string, cwd: string, options: Implement
     filesModified,
     linesAdded,
     linesRemoved,
-    premiumRequests: shutdownResult?.totalPremiumRequests ?? 0,
+    premiumRequestCost: premiumRequestCost ?? shutdownResult?.premiumRequestCost ?? 0,
     model: shutdownResult?.currentModel ?? model,
     quotaRemaining,
   };
@@ -360,7 +381,7 @@ export async function runImplement(task: string, cwd: string, options: Implement
     progress(`Report saved to ${outPath}`);
   }
 
-  log(`implement done: branch=${envelope.branch ?? 'none'} files=${envelope.filesModified.length} premium=${envelope.premiumRequests}`);
+  log(`implement done: branch=${envelope.branch ?? 'none'} files=${envelope.filesModified.length} premiumCost=${envelope.premiumRequestCost}`);
   // Log path hint (useful when running standalone).
   progress(`Job log: ${jobLogPath(stateDir, jobId)}`);
 }
