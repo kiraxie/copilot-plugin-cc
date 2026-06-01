@@ -8159,10 +8159,10 @@ var import_node_path6 = require("node:path");
 var import_node_fs5 = require("node:fs");
 var import_node_path5 = require("node:path");
 function approved() {
-  return { kind: "approved" };
+  return { kind: "approve-once" };
 }
 function denied(feedback) {
-  return { kind: "denied-interactively-by-user", feedback };
+  return { kind: "reject", feedback };
 }
 function canonicalize(p) {
   try {

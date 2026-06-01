@@ -30,12 +30,17 @@ export interface PermissionOptions {
   readOnly?: boolean;
 }
 
+// SDK 1.0 expects *action* kinds from a permission handler. `approve-once` is
+// what the SDK's own `approveAll` returns; `reject` carries optional feedback.
+// (The `approved` / `denied-interactively-by-user` kinds also exist in the
+// union but represent server-side decision *records*, not valid handler
+// responses — returning them yields "unexpected user permission response".)
 function approved(): PermissionRequestResult {
-  return { kind: 'approved' };
+  return { kind: 'approve-once' };
 }
 
 function denied(feedback: string): PermissionRequestResult {
-  return { kind: 'denied-interactively-by-user', feedback };
+  return { kind: 'reject', feedback };
 }
 
 function canonicalize(p: string): string {
