@@ -44,10 +44,11 @@ export interface FixOptions {
   allowShell?: boolean;
   allowUrl?: boolean;
   writePath?: string;
-  /** Inline extra context appended to Copilot's system message. */
+  /**
+   * Extra context appended to Copilot's system message. Literal text, or `@file`
+   * / `@-` (stdin) to read from a source — see `resolveExtraContext`.
+   */
   context?: string;
-  /** Path to a file whose contents are appended to Copilot's system message. */
-  instructionsPath?: string;
   jobId?: string;
 }
 
@@ -341,7 +342,6 @@ export async function runFix(cwd: string, options: FixOptions = {}): Promise<voi
 
   const extraContext = resolveExtraContext(cwd, {
     context: options.context,
-    instructionsPath: options.instructionsPath,
     onWarn: (m) => { progress(m); log(m); },
   });
 

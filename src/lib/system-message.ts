@@ -44,25 +44,35 @@ const FRAMING: Record<SessionKind, string> = {
 };
 
 /**
- * Resolve caller-supplied context from an inline string and/or a file. Returns
- * the combined text, or undefined if neither yields anything. A missing file is
- * surfaced via `onWarn` and skipped rather than aborting the run.
+ * Resolve the caller-supplied `--context` value into text. Following the
+ * curl/gh convention, an `@` prefix means "read from", everything else is
+ * literal:
+ *   - `--context "some text"` → the literal string
+ *   - `--context @path/to/file.md` → the file's contents (resolved vs cwd)
+ *   - `--context @-` → read from stdin
+ * A read failure is surfaced via `onWarn` and yields no context rather than
+ * aborting the run. (To pass a literal string that starts with `@`, there is
+ * no escape today — use `@-` and pipe it, or a file.)
  */
 export function resolveExtraContext(
   cwd: string,
-  opts: { context?: string; instructionsPath?: string; onWarn?: (m: string) => void },
+  opts: { context?: string; onWarn?: (m: string) => void },
 ): string | undefined {
-  const parts: string[] = [];
-  if (opts.context && opts.context.trim()) parts.push(opts.context.trim());
-  if (opts.instructionsPath) {
-    try {
-      const text = readFileSync(resolve(cwd, opts.instructionsPath), 'utf-8').trim();
-      if (text) parts.push(text);
-    } catch (err) {
-      opts.onWarn?.(`Could not read --instructions file ${opts.instructionsPath}: ${(err as Error).message}`);
-    }
+  const raw = opts.context;
+  if (!raw || !raw.trim()) return undefined;
+  if (!raw.startsWith('@')) return raw.trim();
+
+  const ref = raw.slice(1);
+  try {
+    const source = ref === '-' ? 0 : resolve(cwd, ref);
+    const text = readFileSync(source, 'utf-8').trim();
+    return text || undefined;
+  } catch (err) {
+    opts.onWarn?.(
+      `Could not read --context ${ref === '-' ? 'from stdin' : `file ${ref}`}: ${(err as Error).message}`,
+    );
+    return undefined;
   }
-  return parts.length > 0 ? parts.join('\n\n') : undefined;
 }
 
 /** Assemble the `systemMessage.content` string for a delegated session. */

@@ -8459,17 +8459,20 @@ var FRAMING = {
   ].join("\n")
 };
 function resolveExtraContext(cwd, opts) {
-  const parts = [];
-  if (opts.context && opts.context.trim()) parts.push(opts.context.trim());
-  if (opts.instructionsPath) {
-    try {
-      const text = (0, import_node_fs6.readFileSync)((0, import_node_path6.resolve)(cwd, opts.instructionsPath), "utf-8").trim();
-      if (text) parts.push(text);
-    } catch (err) {
-      opts.onWarn?.(`Could not read --instructions file ${opts.instructionsPath}: ${err.message}`);
-    }
+  const raw = opts.context;
+  if (!raw || !raw.trim()) return void 0;
+  if (!raw.startsWith("@")) return raw.trim();
+  const ref = raw.slice(1);
+  try {
+    const source = ref === "-" ? 0 : (0, import_node_path6.resolve)(cwd, ref);
+    const text = (0, import_node_fs6.readFileSync)(source, "utf-8").trim();
+    return text || void 0;
+  } catch (err) {
+    opts.onWarn?.(
+      `Could not read --context ${ref === "-" ? "from stdin" : `file ${ref}`}: ${err.message}`
+    );
+    return void 0;
   }
-  return parts.length > 0 ? parts.join("\n\n") : void 0;
 }
 function buildSystemMessage(kind, input = {}) {
   const sections = [];
@@ -8626,7 +8629,6 @@ async function runImplement(task, cwd, options = {}) {
   });
   const extraContext = resolveExtraContext(cwd, {
     context: options.context,
-    instructionsPath: options.instructionsPath,
     onWarn: (m) => {
       progress(m);
       log(m);
@@ -9394,7 +9396,6 @@ ${FINDINGS_OUTPUT_INSTRUCTION}`;
   });
   const extraContext = resolveExtraContext(cwd, {
     context: options.context,
-    instructionsPath: options.instructionsPath,
     onWarn: (m) => {
       progress(m);
       log(m);
@@ -9735,7 +9736,6 @@ async function runFix(cwd, options = {}) {
   });
   const extraContext = resolveExtraContext(cwd, {
     context: options.context,
-    instructionsPath: options.instructionsPath,
     onWarn: (m) => {
       progress(m);
       log(m);
@@ -10134,7 +10134,6 @@ async function runWorker(jobId, cwd) {
         minQuota: flagNumber(flags, "min-quota"),
         fix: flags["fix"] === true,
         context: flagString(flags, "context"),
-        instructionsPath: flagString(flags, "instructions"),
         jobId
       };
       await runReview(cwd, reviewOpts);
@@ -10149,7 +10148,6 @@ async function runWorker(jobId, cwd) {
         minQuota: flagNumber(flags, "min-quota"),
         writePath: flagString(flags, "write"),
         context: flagString(flags, "context"),
-        instructionsPath: flagString(flags, "instructions"),
         jobId
       };
       const task = extractTask(args, flags);
@@ -10182,16 +10180,16 @@ function printUsage() {
       '  copilot-companion implement "<task>" [--model <id>] [--reasoning <low|medium|high>]',
       "                               [--no-worktree] [--allow-shell] [--allow-url]",
       "                               [--timeout <ms>] [--min-quota <n>]",
-      "                               [--context <text>] [--instructions <file>]",
+      "                               [--context <text|@file|@->]",
       "                               [--background] [--write <path>]",
       "  copilot-companion review [focus...] [--adversarial] [--base <ref>]",
       "                           [--scope auto|working-tree|branch] [--fix]",
       "                           [--model <id>] [--reasoning <low|medium|high|xhigh>]",
-      "                           [--context <text>] [--instructions <file>]",
+      "                           [--context <text|@file|@->]",
       "                           [--timeout <ms>] [--min-quota <n>] [--background]",
       "  copilot-companion fix --findings <path> [--model <id>]",
       "                        [--reasoning <low|medium|high|xhigh>]",
-      "                        [--context <text>] [--instructions <file>]",
+      "                        [--context <text|@file|@->]",
       "                        [--timeout <ms>] [--min-quota <n>] [--write <path>]",
       "  copilot-companion status [job-id] [--all] [--json]",
       "  copilot-companion result [job-id] [--json]",
@@ -10309,8 +10307,7 @@ async function main() {
         allowUrl: flags["allow-url"] === true,
         minQuota: flagNumber2(flags, "min-quota"),
         writePath: flagString2(flags, "write"),
-        context: flagString2(flags, "context"),
-        instructionsPath: flagString2(flags, "instructions")
+        context: flagString2(flags, "context")
       });
       break;
     }
@@ -10334,8 +10331,7 @@ async function main() {
         timeout: flagNumber2(flags, "timeout"),
         minQuota: flagNumber2(flags, "min-quota"),
         fix: flags["fix"] === true,
-        context: flagString2(flags, "context"),
-        instructionsPath: flagString2(flags, "instructions")
+        context: flagString2(flags, "context")
       });
       break;
     }
@@ -10350,8 +10346,7 @@ async function main() {
         allowShell: flags["allow-shell"] === true,
         allowUrl: flags["allow-url"] === true,
         writePath: flagString2(flags, "write"),
-        context: flagString2(flags, "context"),
-        instructionsPath: flagString2(flags, "instructions")
+        context: flagString2(flags, "context")
       });
       break;
     }

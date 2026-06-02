@@ -21,7 +21,7 @@ Mode selection:
 - Default mode is a focused defect review (`gpt-5.3-codex`, medium effort).
 - `--adversarial` switches to a design-challenge review (`gpt-5.5`, high effort) that questions the approach, not just the implementation.
 - `--model` and `--reasoning` override the defaults.
-- `--context <text>` / `--instructions <file>` inject extra intent into Copilot's system message — e.g. "the ignored lint rule is a team decision, don't flag it". In `--fix` mode you can forward your Stage-2 judgment rationale this way. (Copilot already loads the repo's CLAUDE.md/AGENTS.md, so don't repeat those.)
+- `--context <text|@file|@->` injects extra intent into Copilot's system message — e.g. "the ignored lint rule is a team decision, don't flag it". Use a literal string, `@path` for a file, or `@-` for stdin; in `--fix` mode you can forward your Stage-2 judgment rationale this way (write it to a temp file and pass `@that-file`). (Copilot already loads the repo's CLAUDE.md/AGENTS.md, so don't repeat those.)
 
 Execution mode rules:
 - If the raw arguments include `--wait`, do not ask. Run the review in the foreground.

@@ -30,10 +30,11 @@ export interface ReviewOptions {
   reasoning?: ReasoningEffort;
   timeout?: number;
   minQuota?: number;
-  /** Inline extra context appended to Copilot's system message. */
+  /**
+   * Extra context appended to Copilot's system message. Literal text, or `@file`
+   * / `@-` (stdin) to read from a source — see `resolveExtraContext`.
+   */
   context?: string;
-  /** Path to a file whose contents are appended to Copilot's system message. */
-  instructionsPath?: string;
   jobId?: string;
   /**
    * Structured-findings mode. Instead of markdown, emit a `reviewed` JSON
@@ -157,7 +158,6 @@ export async function runReview(cwd: string, options: ReviewOptions = {}): Promi
 
   const extraContext = resolveExtraContext(cwd, {
     context: options.context,
-    instructionsPath: options.instructionsPath,
     onWarn: (m) => { progress(m); log(m); },
   });
 

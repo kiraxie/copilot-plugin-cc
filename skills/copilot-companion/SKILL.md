@@ -21,7 +21,7 @@ Flags:
 - `--no-worktree` — dangerous; do not pass unless the user explicitly asked
 - `--allow-shell` — required for any task that will run tests / builds / installs
 - `--allow-url` — required for any task that will fetch URLs
-- `--context <text>` / `--instructions <file>` — inject conversation-only intent/constraints into Copilot's system message (Copilot already reads the repo's CLAUDE.md/AGENTS.md)
+- `--context <text|@file|@->` — inject conversation-only intent/constraints into Copilot's system message; literal text, `@file`, or `@-` for stdin (Copilot already reads the repo's CLAUDE.md/AGENTS.md)
 - `--timeout <ms>` — hard wall clock timeout; default 30 min
 - `--background` — enqueue; stdout returns `{"status":"queued","jobId":"..."}`
 

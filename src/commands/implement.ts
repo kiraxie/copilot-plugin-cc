@@ -36,10 +36,11 @@ export interface ImplementOptions {
   allowUrl?: boolean;
   minQuota?: number;
   writePath?: string;
-  /** Inline extra context appended to Copilot's system message. */
+  /**
+   * Extra context appended to Copilot's system message. Literal text, or `@file`
+   * / `@-` (stdin) to read from a source — see `resolveExtraContext`.
+   */
   context?: string;
-  /** Path to a file whose contents are appended to Copilot's system message. */
-  instructionsPath?: string;
   /** Pre-allocated job id (used by the background worker to share state). */
   jobId?: string;
 }
@@ -237,7 +238,6 @@ export async function runImplement(task: string, cwd: string, options: Implement
 
   const extraContext = resolveExtraContext(cwd, {
     context: options.context,
-    instructionsPath: options.instructionsPath,
     onWarn: (m) => { progress(m); log(m); },
   });
 
