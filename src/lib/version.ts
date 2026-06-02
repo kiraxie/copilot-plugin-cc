@@ -4,5 +4,5 @@
  * import dance to worry about for the CJS output.
  */
 
-export const PLUGIN_VERSION = '0.4.0';
+export const PLUGIN_VERSION = '0.4.1';
 export const CLIENT_NAME = 'copilot-plugin-cc';
