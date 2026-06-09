@@ -1,6 +1,6 @@
 ---
 description: Run a Copilot code review against local git state. Read-only by default; pass --fix to let Claude Code judge findings and hand the approved ones back to Copilot for repair. Pass --adversarial for a stricter design-challenge review.
-argument-hint: '[--adversarial] [--fix] [--wait|--background] [--base <ref>] [--scope auto|working-tree|branch] [--model <id>] [--reasoning low|medium|high|xhigh] [focus...]'
+argument-hint: '[--fix] [--adversarial] [--wait|--background] [--base <ref>] [focus...]'
 disable-model-invocation: true
 allowed-tools: Read, Write, Glob, Grep, Bash(node:*), Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git rev-parse:*), Bash(git symbolic-ref:*), Bash(git show-ref:*), Bash(git ls-files:*), Bash(git branch:*), AskUserQuestion
 ---

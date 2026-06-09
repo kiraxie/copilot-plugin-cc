@@ -8030,7 +8030,7 @@ function listJobs(stateDir, sessionId) {
 }
 
 // src/lib/version.ts
-var PLUGIN_VERSION = "0.4.1";
+var PLUGIN_VERSION = "0.4.2";
 var CLIENT_NAME = "copilot-plugin-cc";
 
 // src/commands/setup.ts
