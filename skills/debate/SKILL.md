@@ -1,0 +1,125 @@
+---
+name: debate
+description: Run a three-model research debate — opus, gpt-5.5, and gemini-3.1-pro think independently, debate their disagreements over two fixed rounds, then Claude Code synthesizes the result. Use when the user wants multiple frontier models to deliberate a topic, "debate", "council", "second opinions", or "have the models argue X".
+---
+
+# Three-Model Debate
+
+You are the **neutral conductor**. You do not argue a side — you orchestrate
+three independent voices, surface their disagreements, make them debate, and
+synthesize. The structure is **fixed at two rounds**; do not add or skip rounds.
+
+## The three voices (fixed routing — do not substitute)
+
+| Voice | How you call it |
+|-------|-----------------|
+| `opus` | Dispatch a subagent via the Agent tool, `model: opus`. Prompt it to "ultrathink". |
+| `gpt` | Bash: `node "${CLAUDE_PLUGIN_ROOT}/dist/copilot-companion.cjs" ask "<prompt>" --model gpt-5.5 --reasoning high` |
+| `gemini` | Bash: `agy -p "<prompt>" --model "Gemini 3.1 Pro (High)"` |
+
+`${CLAUDE_PLUGIN_ROOT}` is set by Claude Code when the skill runs (the same path
+the sibling `copilot-companion` skill invokes). Pass prompts via a heredoc or a temp file if they contain quotes
+or are long — these are single-shot stateless calls, so the **entire** prompt
+(including all prior-round context) must be in that one string.
+
+## Permissions (do not widen)
+
+No voice touches the filesystem. YOU read any needed files (you already have read
+permission) and inject them as text. Do not pass `--add-dir`,
+`--dangerously-skip-permissions`, or any write/shell flag to `agy`. The `ask`
+command is already read-only.
+
+## Input
+
+The user gives a topic. Optional `--context`:
+- `--context "<text>"` — literal context for all three voices.
+- `--context @<path>` — read that file's content as context.
+- `--context @-` — summarize the **prior conversation** in this session into a
+  context blob.
+- If the topic concerns this repo, you may additionally read the relevant
+  working-directory files yourself and fold concise excerpts into the context.
+
+Build ONE shared `CONTEXT` text block from the above before Round 1.
+
+## Round 1 — independent (run all three in parallel)
+
+Send each voice the SAME framing. Dispatch the Agent call and both Bash calls in
+a single message so they run concurrently.
+
+Prompt template (identical for all three):
+```
+TOPIC:
+<topic>
+
+CONTEXT:
+<CONTEXT, or "(none)">
+
+Think independently and give your own honest, decisive position on this topic.
+State your conclusion first, then your reasoning, key assumptions, and the
+single strongest counter-argument to your own view. ~300-500 words.
+```
+
+Collect the three answers as `R1.opus`, `R1.gpt`, `R1.gemini`.
+
+## Build the disagreement brief
+
+Compare the three R1 answers. Write a short `BRIEF` listing each contested
+point and where the three diverge:
+```
+CONTESTED POINTS:
+1. <point> — opus: <stance> | gpt: <stance> | gemini: <stance>
+2. ...
+(Points all three already agree on: list briefly so they aren't re-litigated.)
+```
+If R1 answers are very long, condense each to its core claims when quoting them
+in Round 2; otherwise pass them in full.
+
+## Round 2 — debate (run all three in parallel)
+
+Send each voice its own R1, the other two R1s, and the BRIEF. Dispatch all three
+concurrently again.
+
+Prompt template (per voice — fill `<self>` with that voice's name):
+```
+You are <self>. This is round 2 of a 3-model debate. Below are all three
+round-1 positions and the contested points.
+
+YOUR ROUND-1 POSITION:
+<R1.self>
+
+OTHER POSITIONS:
+- opus: <R1.opus>
+- gpt: <R1.gpt>
+- gemini: <R1.gemini>   (omit your own line)
+
+CONTESTED POINTS:
+<BRIEF>
+
+Reconsider in light of the others. For each contested point: defend your view
+with a sharper argument, OR update it and say why. End with your final position.
+~300-500 words.
+```
+
+Collect `R2.opus`, `R2.gpt`, `R2.gemini`.
+
+## Synthesis — your final report to the user
+
+Read the three R2 answers and produce exactly these sections:
+```
+## 共識
+<points all three converged on>
+
+## 殘留分歧
+- <point>: opus … / gpt … / gemini …
+
+## 三方最終立場
+- **opus**: <one paragraph>
+- **gpt**: <one paragraph>
+- **gemini**: <one paragraph>
+
+## CC 綜合建議
+<your neutral synthesis and recommendation, calling out which argument is
+strongest on each contested point and why>
+```
+
+Do not write transcripts to disk. Only print this report.

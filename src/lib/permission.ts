@@ -28,6 +28,15 @@ export interface PermissionOptions {
    * of path. Used by the review command (no worktree, no edits expected).
    */
   readOnly?: boolean;
+  /**
+   * Isolated reasoning mode. When true, the session may not touch the
+   * filesystem or call tools at all: read and MCP requests are denied outright
+   * (writes/shell/url/custom-tool are already denied by the read-only and
+   * default-deny paths). Used by the `ask` command so the debate feature's
+   * "no backend touches the filesystem" guarantee is enforced, not just
+   * promised in prompt text.
+   */
+  isolated?: boolean;
 }
 
 // SDK 1.0 expects *action* kinds from a permission handler. `approve-once` is
@@ -76,6 +85,10 @@ export function makePermissionHandler(opts: PermissionOptions): PermissionHandle
     switch (kind) {
       case 'read': {
         const path = (request as { path?: string }).path ?? '';
+        if (opts.isolated) {
+          opts.appendLog(`permission.read DENIED (isolated mode): ${path}`);
+          return denied('This Copilot session is isolated (reasoning only); filesystem reads are not permitted.');
+        }
         if (opts.readOnly) {
           // In review mode, restrict reads to the working tree to prevent
           // prompt-injection-driven exfiltration of files outside the repo
@@ -120,6 +133,10 @@ export function makePermissionHandler(opts: PermissionOptions): PermissionHandle
           toolName?: string;
           readOnly?: boolean;
         };
+        if (opts.isolated) {
+          opts.appendLog(`permission.mcp DENIED (isolated mode): ${serverName}/${toolName}`);
+          return denied(`This Copilot session is isolated (reasoning only); MCP tool ${serverName}/${toolName} is not permitted.`);
+        }
         if (opts.readOnly && readOnly !== true) {
           // In review mode we only auto-approve MCP calls the SDK explicitly
           // marks read-only; anything else is a potential side-effect path.

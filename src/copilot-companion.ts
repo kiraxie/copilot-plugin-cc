@@ -8,6 +8,7 @@ import process from 'node:process';
 import { runSetup } from './commands/setup.js';
 import { runImplement } from './commands/implement.js';
 import { runReview } from './commands/review.js';
+import { runAsk } from './commands/ask.js';
 import { runFix } from './commands/fix.js';
 import { runStatus } from './commands/status.js';
 import { runResult } from './commands/result.js';
@@ -30,6 +31,7 @@ function printUsage(): void {
       '                           [--model <id>] [--reasoning <low|medium|high|xhigh>]',
       '                           [--context <text|@file|@->]',
       '                           [--timeout <ms>] [--min-quota <n>] [--background]',
+      '  copilot-companion ask "<prompt>" [--model <id>] [--reasoning <low|medium|high|xhigh>] [--context <text|@file|@->]',
       '  copilot-companion fix --findings <path> [--model <id>]',
       '                        [--reasoning <low|medium|high|xhigh>]',
       '                        [--context <text|@file|@->]',
@@ -41,6 +43,7 @@ function printUsage(): void {
       '  setup       Check GitHub Copilot authentication, available models, quota',
       '  implement   Delegate an implementation task to GitHub Copilot',
       '  review      Run a Copilot code review (markdown, or JSON findings with --fix)',
+      '  ask         Ask Copilot a single prompt (read-only) and print the answer',
       '  fix         Apply Claude-Code-approved review findings to the working tree',
       '  status      Show quota plus background job status',
       '  result      Retrieve a background job\'s output',
@@ -208,6 +211,20 @@ async function main(): Promise<void> {
         timeout: flagNumber(flags, 'timeout'),
         minQuota: flagNumber(flags, 'min-quota'),
         fix: flags['fix'] === true,
+        context: flagString(flags, 'context'),
+      });
+      break;
+    }
+
+    case 'ask': {
+      const reasoning = flagEnum(flags, 'reasoning', ['low', 'medium', 'high', 'xhigh'] as const);
+      const prompt = extractTask(args, flags); // reuse positional/`--task`/stdin extraction
+      await runAsk(process.cwd(), {
+        prompt,
+        model: flagString(flags, 'model'),
+        reasoning,
+        timeout: flagNumber(flags, 'timeout'),
+        minQuota: flagNumber(flags, 'min-quota'),
         context: flagString(flags, 'context'),
       });
       break;

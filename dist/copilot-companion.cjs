@@ -7604,10 +7604,9 @@ async function fetchQuota(client, stateDir) {
 function isPremiumModel(modelId) {
   if (!modelId) return true;
   const id = modelId.toLowerCase();
-  if (id.startsWith("claude-opus-")) return true;
   if (id.startsWith("claude-sonnet-")) return false;
   if (id.startsWith("claude-haiku-")) return false;
-  if (id.startsWith("gpt-")) return false;
+  if (id.endsWith("-mini") || id.startsWith("gpt-4.1")) return false;
   return true;
 }
 function evaluateGate(snapshot, opts) {
@@ -8136,6 +8135,7 @@ async function runSetup(options = {}) {
   lines.push("### Next steps");
   lines.push('- `/copilot:implement "your task"` to delegate');
   lines.push("- `/copilot:status` to see quota + running jobs");
+  lines.push('- `/copilot:debate "<topic>"` for a three-model debate (needs the `agy` CLI for the Gemini voice)');
   console.log(lines.join("\n"));
 }
 function emit(options, report) {
@@ -8186,6 +8186,10 @@ function makePermissionHandler(opts) {
     switch (kind) {
       case "read": {
         const path = request.path ?? "";
+        if (opts.isolated) {
+          opts.appendLog(`permission.read DENIED (isolated mode): ${path}`);
+          return denied("This Copilot session is isolated (reasoning only); filesystem reads are not permitted.");
+        }
         if (opts.readOnly) {
           if (!path) {
             opts.appendLog("permission.read DENIED (read-only mode): empty path");
@@ -8220,6 +8224,10 @@ function makePermissionHandler(opts) {
       }
       case "mcp": {
         const { serverName, toolName, readOnly } = request;
+        if (opts.isolated) {
+          opts.appendLog(`permission.mcp DENIED (isolated mode): ${serverName}/${toolName}`);
+          return denied(`This Copilot session is isolated (reasoning only); MCP tool ${serverName}/${toolName} is not permitted.`);
+        }
         if (opts.readOnly && readOnly !== true) {
           opts.appendLog(`permission.mcp DENIED (read-only mode): ${serverName}/${toolName} (readOnly=${readOnly ?? "unknown"})`);
           return denied(`MCP tool ${serverName}/${toolName} is not marked read-only; not permitted in this Copilot review session.`);
@@ -8444,19 +8452,26 @@ var import_node_fs6 = require("node:fs");
 var import_node_path6 = require("node:path");
 var FRAMING = {
   implement: [
-    "You are executing a self-contained coding subtask delegated by Claude Code\u2019s orchestrator. You run headless: there is no interactive user at the keyboard for this session.",
+    "You are executing a self-contained coding subtask delegated by Claude Code's orchestrator. You run headless: there is no interactive user at the keyboard for this session.",
     "Your edits happen in an isolated git worktree, so they cannot disturb the main checkout. Do NOT run `git commit` \u2014 the plugin commits your changes for you after you finish.",
-    "Follow the repository\u2019s existing conventions and patterns (its instruction files are already loaded). Stay tightly scoped to the task; avoid unrelated refactors or formatting churn."
+    "Follow the repository's existing conventions and patterns (its instruction files are already loaded). Stay tightly scoped to the task; avoid unrelated refactors or formatting churn."
   ].join("\n"),
   fix: [
-    "You are applying code-review findings that a human has already vetted and approved, delegated by Claude Code\u2019s orchestrator. You run headless.",
+    "You are applying code-review findings that a human has already vetted and approved, delegated by Claude Code's orchestrator. You run headless.",
     "Edit the real working tree directly. Make the minimal, correct change for each approved finding; do not refactor unrelated code and do NOT run `git commit` (the plugin manages commits and leaves your edits staged for review).",
     "If a finding cannot be safely applied, skip it and report why rather than forcing a change."
   ].join("\n"),
   review: [
-    "You are performing a code review delegated by Claude Code\u2019s orchestrator. You run headless.",
+    "You are performing a code review delegated by Claude Code's orchestrator. You run headless.",
     "This session is read-only: do not attempt to modify files. Report findings; another stage applies any fixes."
-  ].join("\n")
+  ].join("\n"),
+  ask: [
+    "You are one independent voice being consulted on a question or topic.",
+    "Reason carefully and state your own honest conclusion. Use only the context",
+    "provided in the prompt \u2014 do not explore the filesystem or run tools.",
+    "Be concrete and decisive; surface key assumptions and the strongest",
+    "counter-argument to your own position."
+  ].join(" ")
 };
 function resolveExtraContext(cwd, opts) {
   const raw = opts.context;
@@ -9516,14 +9531,179 @@ ${reviewBody}
   progress(`Job log: ${jobLogPath(stateDir, jobId)}`);
 }
 
+// src/commands/ask.ts
+var DEFAULT_TIMEOUT_MS3 = 30 * 60 * 1e3;
+var DEFAULT_MODEL3 = "gpt-5.5";
+var DEFAULT_EFFORT2 = "high";
+function progressFactory3() {
+  return (message) => {
+    const time = (/* @__PURE__ */ new Date()).toLocaleTimeString("en-US", { hour12: false });
+    process.stderr.write(`[${time}] ${message}
+`);
+  };
+}
+async function runAsk(cwd, options) {
+  const progress = progressFactory3();
+  const model = options.model ?? DEFAULT_MODEL3;
+  const reasoning = options.reasoning ?? DEFAULT_EFFORT2;
+  const timeout = options.timeout ?? DEFAULT_TIMEOUT_MS3;
+  const minQuota = options.minQuota ?? 1;
+  const prompt = options.prompt.trim();
+  if (!prompt) throw new Error("ask: empty prompt");
+  const stateDir = resolveStateDir(cwd);
+  const jobId = options.jobId ?? generateJobId();
+  const log = (msg) => appendLog(stateDir, jobId, msg);
+  log(`ask start: model=${model} effort=${reasoning} promptChars=${prompt.length}`);
+  const snapshot = readSnapshot(stateDir);
+  if (isPremiumModel(model)) {
+    const gate = evaluateGate(snapshot, { minRemaining: minQuota });
+    if (!gate.ok) {
+      log(`quota blocked: remaining=${gate.remaining} resetAt=${gate.resetAt}`);
+      throw new Error(`Quota exhausted \u2014 ask not started. Resets at ${gate.resetAt || "unknown"}.`);
+    }
+    if (gate.ok && "warning" in gate && gate.warning) progress(gate.warning);
+  } else {
+    log(`quota gate skipped: model ${model} is not premium-metered`);
+  }
+  const client = new CopilotClient({ workingDirectory: cwd, env: process.env });
+  let cleanupDone = false;
+  let aborted = false;
+  const finalize = async (errorMessage) => {
+    if (cleanupDone) return;
+    cleanupDone = true;
+    try {
+      await client.forceStop();
+    } catch {
+    }
+    if (errorMessage) process.stderr.write(`Ask failed: ${errorMessage}
+`);
+  };
+  const onSignal = async () => {
+    if (aborted) return;
+    aborted = true;
+    progress("Received interrupt; aborting ask.");
+    log("interrupt");
+    await finalize("Interrupted by signal");
+    process.exit(130);
+  };
+  process.on("SIGINT", () => void onSignal());
+  process.on("SIGTERM", () => void onSignal());
+  try {
+    await client.start();
+  } catch (err) {
+    const msg = `Failed to start Copilot CLI: ${err.message}`;
+    await finalize(msg);
+    throw new Error(msg);
+  }
+  const auth = await checkAuth(client);
+  if (!auth.ok) {
+    log(`auth failed: ${auth.message}`);
+    const msg = `Not authenticated: ${auth.message}`;
+    await finalize(msg);
+    await client.stop().catch(() => {
+    });
+    throw new Error(msg);
+  }
+  log(`auth ok: ${auth.authType}${auth.login ? ` as ${auth.login}` : ""}`);
+  const permissionHandler = makePermissionHandler({
+    allowShell: false,
+    allowUrl: false,
+    worktreePath: cwd,
+    appendLog: log,
+    readOnly: true,
+    isolated: true
+  });
+  const extraContext = resolveExtraContext(cwd, {
+    context: options.context,
+    onWarn: (m) => {
+      progress(m);
+      log(m);
+    }
+  });
+  let session;
+  try {
+    session = await client.createSession({
+      clientName: `${CLIENT_NAME}/${PLUGIN_VERSION}`,
+      model,
+      reasoningEffort: reasoning,
+      workingDirectory: cwd,
+      infiniteSessions: { enabled: false },
+      onPermissionRequest: permissionHandler,
+      systemMessage: { mode: "append", content: buildSystemMessage("ask", { extraContext }) }
+    });
+  } catch (err) {
+    const msg = `Failed to create Copilot session: ${err.message}`;
+    log(msg);
+    await client.stop().catch((e) => log(`client.stop warn: ${e.message}`));
+    await finalize(msg);
+    throw new Error(msg);
+  }
+  const stream = attachStream({ session, stateDir, appendLog: log, progress });
+  let completionResult = null;
+  let premiumRequestCost;
+  let timedOut = false;
+  let sessionTorn = false;
+  const timeoutHandle = setTimeout(() => {
+    timedOut = true;
+    progress(`Timeout after ${timeout}ms \u2014 aborting session.`);
+    log(`timeout ${timeout}ms`);
+    session.abort().catch((e) => log(`abort error: ${e.message}`));
+  }, timeout);
+  const tearDownSession = async () => {
+    if (sessionTorn) return;
+    sessionTorn = true;
+    clearTimeout(timeoutHandle);
+    await session.disconnect().catch((e) => log(`disconnect warn: ${e.message}`));
+    stream.dispose();
+    await fetchQuota(client, stateDir).catch(() => null);
+    await client.stop().catch((e) => log(`client.stop warn: ${e.message}`));
+  };
+  try {
+    progress(`Sending prompt to Copilot (model=${model}, effort=${reasoning})\u2026`);
+    await session.send({ prompt });
+    completionResult = await stream.completion;
+    progress("Answer complete; collecting usage metrics.");
+    try {
+      const metrics = await session.rpc.usage.getMetrics();
+      premiumRequestCost = metrics.totalPremiumRequestCost;
+    } catch (e) {
+      log(`usage.getMetrics failed: ${e.message}`);
+    }
+  } catch (err) {
+    const msg = err.message;
+    log(`session error: ${msg}`);
+    await tearDownSession();
+    await finalize(msg);
+    throw new Error(msg);
+  } finally {
+    await tearDownSession();
+  }
+  const body = stream.getLastAssistantMessage()?.trim() || completionResult?.summary && completionResult.summary.trim() || "_(Copilot returned an empty answer.)_";
+  const success = completionResult?.success !== false && !timedOut;
+  if (!success) {
+    const reason = timedOut ? `Timed out after ${timeout}ms.` : "Ask did not complete successfully.";
+    process.stdout.write(`${body}
+`);
+    log(`ask failed: ${reason}`);
+    throw new Error(reason);
+  }
+  process.stdout.write(`${body.trim()}
+`);
+  const quotaRemaining = summarize(readSnapshot(stateDir));
+  const premium = premiumRequestCost ?? 0;
+  progress(`Ask done \u2014 model=${model} effort=${reasoning} premium-cost=${fmtNum(premium)}`);
+  log(`ask done: premium=${premium}`);
+  progress(`Job log: ${jobLogPath(stateDir, jobId)}`);
+}
+
 // src/commands/fix.ts
 var import_node_child_process4 = require("node:child_process");
 var import_node_fs9 = require("node:fs");
 var import_node_path9 = require("node:path");
-var DEFAULT_MODEL3 = "claude-opus-4.8";
-var DEFAULT_EFFORT2 = "high";
-var DEFAULT_TIMEOUT_MS3 = 30 * 60 * 1e3;
-function progressFactory3() {
+var DEFAULT_MODEL4 = "claude-opus-4.8";
+var DEFAULT_EFFORT3 = "high";
+var DEFAULT_TIMEOUT_MS4 = 30 * 60 * 1e3;
+function progressFactory4() {
   return (message) => {
     const time = (/* @__PURE__ */ new Date()).toLocaleTimeString("en-US", { hour12: false });
     process.stderr.write(`[${time}] ${message}
@@ -9626,12 +9806,12 @@ function computeStagedDiff(cwd, baseline) {
   return { filesModified, linesAdded, linesRemoved };
 }
 async function runFix(cwd, options = {}) {
-  const progress = progressFactory3();
+  const progress = progressFactory4();
   const stateDir = resolveStateDir(cwd);
   const jobId = options.jobId ?? generateJobId();
-  const model = options.model ?? DEFAULT_MODEL3;
-  const reasoning = options.reasoning ?? DEFAULT_EFFORT2;
-  const timeout = options.timeout ?? DEFAULT_TIMEOUT_MS3;
+  const model = options.model ?? DEFAULT_MODEL4;
+  const reasoning = options.reasoning ?? DEFAULT_EFFORT3;
+  const timeout = options.timeout ?? DEFAULT_TIMEOUT_MS4;
   const minQuota = options.minQuota ?? 1;
   const log = (msg) => appendLog(stateDir, jobId, msg);
   if (!options.findingsPath) {
@@ -10187,6 +10367,7 @@ function printUsage() {
       "                           [--model <id>] [--reasoning <low|medium|high|xhigh>]",
       "                           [--context <text|@file|@->]",
       "                           [--timeout <ms>] [--min-quota <n>] [--background]",
+      '  copilot-companion ask "<prompt>" [--model <id>] [--reasoning <low|medium|high|xhigh>] [--context <text|@file|@->]',
       "  copilot-companion fix --findings <path> [--model <id>]",
       "                        [--reasoning <low|medium|high|xhigh>]",
       "                        [--context <text|@file|@->]",
@@ -10198,6 +10379,7 @@ function printUsage() {
       "  setup       Check GitHub Copilot authentication, available models, quota",
       "  implement   Delegate an implementation task to GitHub Copilot",
       "  review      Run a Copilot code review (markdown, or JSON findings with --fix)",
+      "  ask         Ask Copilot a single prompt (read-only) and print the answer",
       "  fix         Apply Claude-Code-approved review findings to the working tree",
       "  status      Show quota plus background job status",
       "  result      Retrieve a background job's output"
@@ -10331,6 +10513,19 @@ async function main() {
         timeout: flagNumber2(flags, "timeout"),
         minQuota: flagNumber2(flags, "min-quota"),
         fix: flags["fix"] === true,
+        context: flagString2(flags, "context")
+      });
+      break;
+    }
+    case "ask": {
+      const reasoning = flagEnum(flags, "reasoning", ["low", "medium", "high", "xhigh"]);
+      const prompt = extractTask(args, flags);
+      await runAsk(import_node_process.default.cwd(), {
+        prompt,
+        model: flagString2(flags, "model"),
+        reasoning,
+        timeout: flagNumber2(flags, "timeout"),
+        minQuota: flagNumber2(flags, "min-quota"),
         context: flagString2(flags, "context")
       });
       break;
