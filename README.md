@@ -25,9 +25,18 @@ claude plugin install copilot@copilot-plugin-cc
 | Command | Description |
 |---|---|
 | `/copilot:implement "<task>"` | Delegate an implementation task. Returns a branch name, summary, and diff stats. |
+| `/copilot:debate "<topic>"` | Three models (opus-4.8, gpt-5.5, gemini-3.1-pro) reason independently, debate their disagreements over two fixed rounds, then Claude Code synthesizes a verdict. Only gpt-5.5 uses Copilot quota (~2 premium requests/debate); opus runs on your Claude subscription, gemini on your Google subscription via `agy`. Requires the `agy` (Antigravity) CLI on PATH. |
 | `/copilot:setup` | Check auth, list available models, show quota snapshot. |
 | `/copilot:status [job-id]` | Show quota + background job status. |
 | `/copilot:result [job-id]` | Fetch a completed background job's output. |
+
+### `ask` command
+
+```bash
+copilot ask "<prompt>"
+```
+
+Ask Copilot a single prompt (read-only) and print the answer. This is the gpt-5.5 backend used by `/copilot:debate`. Uses ~1 Copilot premium request per call.
 
 ### `implement` flags
 

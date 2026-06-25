@@ -8136,6 +8136,7 @@ async function runSetup(options = {}) {
   lines.push("### Next steps");
   lines.push('- `/copilot:implement "your task"` to delegate');
   lines.push("- `/copilot:status` to see quota + running jobs");
+  lines.push('- `/copilot:debate "<topic>"` for a three-model debate (needs the `agy` CLI for the Gemini voice)');
   console.log(lines.join("\n"));
 }
 function emit(options, report) {
