@@ -15,23 +15,31 @@ synthesize. The structure is **fixed at two rounds**; do not add or skip rounds.
 |-------|-----------------|
 | `opus` | Dispatch a subagent via the Agent tool, `model: opus`. Prompt it to "ultrathink". |
 | `gpt` | Bash: `node "${CLAUDE_PLUGIN_ROOT}/dist/copilot-companion.cjs" ask "<prompt>" --model gpt-5.5 --reasoning high` |
-| `gemini` | Bash: `agy -p "<single-line-prompt>" --model "Gemini 3.1 Pro (High)" --print-timeout 9m` |
+| `gemini` | Bash: `agy -p "<prompt>" --model "Gemini 3.1 Pro (High)" --print-timeout 20m`, run with a Bash timeout ≥ 20m (and prefer `run_in_background`) |
 
 `${CLAUDE_PLUGIN_ROOT}` is set by Claude Code when the skill runs (the same path
 the sibling `copilot-companion` skill invokes). These are single-shot stateless
 calls, so the **entire** prompt (including all prior-round context) must be in
 that one string.
 
-**`agy` quirk — the gemini prompt MUST be a single line.** `agy -p` hangs
-indefinitely on any prompt containing a newline (verified: a multi-line prompt
-times out past 10 min; the same content on one line returns in ~25s). For the
-gemini voice ONLY, flatten the prompt before passing it — replace every newline
-with `" "` or `" / "` so it is one physical line. This matters most in Round 2,
-where the prompt embeds the (multi-line) Round-1 answers: flatten the whole
-thing. `opus` (Agent tool) and `gpt` (`ask`, via a shell variable / heredoc)
-accept multi-line prompts normally — only `agy` needs flattening. Also pass
-`--print-timeout 9m`: high-effort Gemini reasoning can take well over the 5-minute
-default, and your Bash call timeout must exceed that too.
+**`agy` is slow and high-variance — plan for it.** Live measurement of
+`Gemini 3.1 Pro (High)` via `agy -p`: the same prompt returned in 11–25s on some
+runs and took **18+ minutes** on others, with no correlation to prompt length or
+formatting (an earlier theory that multi-line prompts hang was disproven — single-line
+prompts also ran 18 min). `--print-timeout` did NOT reliably cap the wait (a `3m`
+setting still ran 18 min). Practical consequences for the conductor:
+- Run the gemini call with `run_in_background: true` and a generous Bash timeout
+  (≥ 20 min), so a slow Gemini turn doesn't block the opus/gpt voices — dispatch
+  all three, then collect gemini whenever it lands.
+- It usually succeeds eventually (exit 0 with a real answer); treat a true >20-min
+  hang, not mere slowness, as failure. If gemini fails twice, proceed with a
+  **two-voice debate** (opus + gpt) and say so explicitly in the final report
+  rather than blocking the whole debate on the slowest leg.
+- If predictable latency matters more than peak reasoning depth, `Gemini 3.1 Pro
+  (Low)` was consistently fast (~14s) in testing — but the fixed routing calls for
+  High, so only drop to Low if the user opts in.
+`opus` (Agent tool) and `gpt` (`ask`, via a shell variable / heredoc) accept
+multi-line prompts normally.
 
 ## Permissions (do not widen)
 
