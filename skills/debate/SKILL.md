@@ -14,11 +14,11 @@ synthesize. The structure is **fixed at two rounds**; do not add or skip rounds.
 | Voice | How you call it |
 |-------|-----------------|
 | `opus` | Dispatch a subagent via the Agent tool, `model: opus`. Prompt it to "ultrathink". |
-| `gpt` | Bash: `node "$COPILOT_CLI" ask "<prompt>" --model gpt-5.5 --reasoning high` |
+| `gpt` | Bash: `node "${CLAUDE_PLUGIN_ROOT}/dist/copilot-companion.cjs" ask "<prompt>" --model gpt-5.5 --reasoning high` |
 | `gemini` | Bash: `agy -p "<prompt>" --model "Gemini 3.1 Pro (High)"` |
 
-`$COPILOT_CLI` is this plugin's `dist/copilot-companion.cjs` (same path sibling
-skills invoke). Pass prompts via a heredoc or a temp file if they contain quotes
+`${CLAUDE_PLUGIN_ROOT}` is set by Claude Code when the skill runs (the same path
+the sibling `copilot-companion` skill invokes). Pass prompts via a heredoc or a temp file if they contain quotes
 or are long — these are single-shot stateless calls, so the **entire** prompt
 (including all prior-round context) must be in that one string.
 
