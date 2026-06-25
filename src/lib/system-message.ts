@@ -17,7 +17,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-export type SessionKind = 'implement' | 'fix' | 'review';
+export type SessionKind = 'implement' | 'fix' | 'review' | 'ask';
 
 export interface SystemMessageInput {
   /** Branch the work happens on (implement worktree). */
@@ -28,19 +28,26 @@ export interface SystemMessageInput {
 
 const FRAMING: Record<SessionKind, string> = {
   implement: [
-    'You are executing a self-contained coding subtask delegated by Claude Code’s orchestrator. You run headless: there is no interactive user at the keyboard for this session.',
+    "You are executing a self-contained coding subtask delegated by Claude Code's orchestrator. You run headless: there is no interactive user at the keyboard for this session.",
     'Your edits happen in an isolated git worktree, so they cannot disturb the main checkout. Do NOT run `git commit` — the plugin commits your changes for you after you finish.',
-    'Follow the repository’s existing conventions and patterns (its instruction files are already loaded). Stay tightly scoped to the task; avoid unrelated refactors or formatting churn.',
+    "Follow the repository's existing conventions and patterns (its instruction files are already loaded). Stay tightly scoped to the task; avoid unrelated refactors or formatting churn.",
   ].join('\n'),
   fix: [
-    'You are applying code-review findings that a human has already vetted and approved, delegated by Claude Code’s orchestrator. You run headless.',
-    'Edit the real working tree directly. Make the minimal, correct change for each approved finding; do not refactor unrelated code and do NOT run `git commit` (the plugin manages commits and leaves your edits staged for review).',
+    "You are applying code-review findings that a human has already vetted and approved, delegated by Claude Code's orchestrator. You run headless.",
+    "Edit the real working tree directly. Make the minimal, correct change for each approved finding; do not refactor unrelated code and do NOT run `git commit` (the plugin manages commits and leaves your edits staged for review).",
     'If a finding cannot be safely applied, skip it and report why rather than forcing a change.',
   ].join('\n'),
   review: [
-    'You are performing a code review delegated by Claude Code’s orchestrator. You run headless.',
+    "You are performing a code review delegated by Claude Code's orchestrator. You run headless.",
     'This session is read-only: do not attempt to modify files. Report findings; another stage applies any fixes.',
   ].join('\n'),
+  ask: [
+    'You are one independent voice being consulted on a question or topic.',
+    'Reason carefully and state your own honest conclusion. Use only the context',
+    'provided in the prompt — do not explore the filesystem or run tools.',
+    'Be concrete and decisive; surface key assumptions and the strongest',
+    'counter-argument to your own position.',
+  ].join(' '),
 };
 
 /**
