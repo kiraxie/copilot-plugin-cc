@@ -15,12 +15,23 @@ synthesize. The structure is **fixed at two rounds**; do not add or skip rounds.
 |-------|-----------------|
 | `opus` | Dispatch a subagent via the Agent tool, `model: opus`. Prompt it to "ultrathink". |
 | `gpt` | Bash: `node "${CLAUDE_PLUGIN_ROOT}/dist/copilot-companion.cjs" ask "<prompt>" --model gpt-5.5 --reasoning high` |
-| `gemini` | Bash: `agy -p "<prompt>" --model "Gemini 3.1 Pro (High)"` |
+| `gemini` | Bash: `agy -p "<single-line-prompt>" --model "Gemini 3.1 Pro (High)" --print-timeout 9m` |
 
 `${CLAUDE_PLUGIN_ROOT}` is set by Claude Code when the skill runs (the same path
-the sibling `copilot-companion` skill invokes). Pass prompts via a heredoc or a temp file if they contain quotes
-or are long — these are single-shot stateless calls, so the **entire** prompt
-(including all prior-round context) must be in that one string.
+the sibling `copilot-companion` skill invokes). These are single-shot stateless
+calls, so the **entire** prompt (including all prior-round context) must be in
+that one string.
+
+**`agy` quirk — the gemini prompt MUST be a single line.** `agy -p` hangs
+indefinitely on any prompt containing a newline (verified: a multi-line prompt
+times out past 10 min; the same content on one line returns in ~25s). For the
+gemini voice ONLY, flatten the prompt before passing it — replace every newline
+with `" "` or `" / "` so it is one physical line. This matters most in Round 2,
+where the prompt embeds the (multi-line) Round-1 answers: flatten the whole
+thing. `opus` (Agent tool) and `gpt` (`ask`, via a shell variable / heredoc)
+accept multi-line prompts normally — only `agy` needs flattening. Also pass
+`--print-timeout 9m`: high-effort Gemini reasoning can take well over the 5-minute
+default, and your Bash call timeout must exceed that too.
 
 ## Permissions (do not widen)
 
