@@ -111,6 +111,7 @@ export async function runAsk(cwd: string, options: AskOptions): Promise<void> {
     worktreePath: cwd,
     appendLog: log,
     readOnly: true,
+    isolated: true,
   });
 
   const extraContext = resolveExtraContext(cwd, {

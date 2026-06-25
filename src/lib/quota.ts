@@ -113,20 +113,22 @@ export async function fetchQuota(
 }
 
 /**
- * Whether a Copilot model ID consumes the premium request pool. Known
- * premium-metered family today is `claude-opus-*`; everything else (Sonnet,
- * Haiku, GPT-5.x, GPT-4.1) is Standard or Fast tier and does not increment
- * `premium_interactions`. Conservative default: unknown IDs are treated as
- * premium so the gate still protects the user.
+ * Whether a Copilot model ID consumes the premium request pool. Premium-metered
+ * families include `claude-opus-*` and the full-size GPT-5.x models — observed:
+ * a single `gpt-5.5` (high) call decrements `premium_interactions` and reports a
+ * non-zero `premiumRequestCost`. Standard/Fast tier (Sonnet, Haiku, the GPT
+ * `*-mini` variants, GPT-4.1) does not. Conservative default: anything not
+ * explicitly known-cheap is treated as premium so the gate still protects the
+ * user.
  */
 export function isPremiumModel(modelId: string | undefined): boolean {
   if (!modelId) return true;
   const id = modelId.toLowerCase();
-  if (id.startsWith('claude-opus-')) return true;
   if (id.startsWith('claude-sonnet-')) return false;
   if (id.startsWith('claude-haiku-')) return false;
-  if (id.startsWith('gpt-')) return false;
-  // Unknown family — fail closed.
+  // Known Standard/Fast-tier GPT models that do not meter premium requests.
+  if (id.endsWith('-mini') || id.startsWith('gpt-4.1')) return false;
+  // claude-opus-*, gpt-5.x full-size, and any unknown family — fail closed.
   return true;
 }
 

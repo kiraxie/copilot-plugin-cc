@@ -7604,10 +7604,9 @@ async function fetchQuota(client, stateDir) {
 function isPremiumModel(modelId) {
   if (!modelId) return true;
   const id = modelId.toLowerCase();
-  if (id.startsWith("claude-opus-")) return true;
   if (id.startsWith("claude-sonnet-")) return false;
   if (id.startsWith("claude-haiku-")) return false;
-  if (id.startsWith("gpt-")) return false;
+  if (id.endsWith("-mini") || id.startsWith("gpt-4.1")) return false;
   return true;
 }
 function evaluateGate(snapshot, opts) {
@@ -8187,6 +8186,10 @@ function makePermissionHandler(opts) {
     switch (kind) {
       case "read": {
         const path = request.path ?? "";
+        if (opts.isolated) {
+          opts.appendLog(`permission.read DENIED (isolated mode): ${path}`);
+          return denied("This Copilot session is isolated (reasoning only); filesystem reads are not permitted.");
+        }
         if (opts.readOnly) {
           if (!path) {
             opts.appendLog("permission.read DENIED (read-only mode): empty path");
@@ -8221,6 +8224,10 @@ function makePermissionHandler(opts) {
       }
       case "mcp": {
         const { serverName, toolName, readOnly } = request;
+        if (opts.isolated) {
+          opts.appendLog(`permission.mcp DENIED (isolated mode): ${serverName}/${toolName}`);
+          return denied(`This Copilot session is isolated (reasoning only); MCP tool ${serverName}/${toolName} is not permitted.`);
+        }
         if (opts.readOnly && readOnly !== true) {
           opts.appendLog(`permission.mcp DENIED (read-only mode): ${serverName}/${toolName} (readOnly=${readOnly ?? "unknown"})`);
           return denied(`MCP tool ${serverName}/${toolName} is not marked read-only; not permitted in this Copilot review session.`);
@@ -9603,7 +9610,8 @@ async function runAsk(cwd, options) {
     allowUrl: false,
     worktreePath: cwd,
     appendLog: log,
-    readOnly: true
+    readOnly: true,
+    isolated: true
   });
   const extraContext = resolveExtraContext(cwd, {
     context: options.context,
